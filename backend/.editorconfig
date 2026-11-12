@@ -1,0 +1,26 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,csproj,props,slnx,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+
+# EF Core generates these files; they are never hand-edited.
+[**/Persistence/Migrations/*.cs]
+generated_code = true
+
+# Test names are sentences describing behaviour; underscores keep them readable.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1822.severity = none   # probe controller actions are deliberately instance methods
+dotnet_diagnostic.CA1711.severity = none   # xunit CollectionDefinition types end in "Collection"
