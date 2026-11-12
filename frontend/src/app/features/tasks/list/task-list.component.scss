@@ -1,0 +1,90 @@
+.page-header { margin-bottom: var(--tf-space-4); }
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 28rem) 1fr;
+  gap: var(--tf-space-3) var(--tf-space-6);
+  align-items: center;
+  padding: var(--tf-space-4) var(--tf-space-6);
+
+  &__search { display: flex; gap: var(--tf-space-2); grid-column: 1; grid-row: 1; }
+  &__search nz-input-group { flex: 1; }
+  &__toggle { display: none; }
+  &__count { margin-left: var(--tf-space-2); padding: 0 var(--tf-space-2); border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-pill); background: var(--tf-lemon); color: var(--tf-on-color); font-size: var(--tf-text-caption); font-weight: 700; }
+
+  &__filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-3); grid-column: 1 / -1; grid-row: 2; }
+  &__clear { padding-inline: var(--tf-space-2); }
+
+  &__sort { display: flex; align-items: center; gap: var(--tf-space-2); grid-column: 2; grid-row: 1; justify-self: end; }
+  &__sort-label { color: var(--tf-ink-soft); font-size: var(--tf-text-small); font-weight: 600; }
+  &__direction { min-width: 42px; padding-inline: 0; }
+}
+
+.control { min-width: 9.5rem; }
+.control--range { min-width: 17rem; }
+.control--sort { min-width: 10.5rem; }
+
+.summary { min-height: 1.5rem; margin: var(--tf-space-4) 0 var(--tf-space-2); color: var(--tf-ink-soft); font-size: var(--tf-text-small); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+// Each task is a sticker; the stagger plays once when the list appears.
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--tf-space-3); }
+
+.row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 44px;
+  align-items: center;
+  column-gap: var(--tf-space-3);
+  padding: var(--tf-space-3) var(--tf-space-3) var(--tf-space-3) var(--tf-space-2);
+  transition: transform 180ms var(--tf-ease-pop), box-shadow 180ms ease, opacity 200ms ease;
+
+  &:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--tf-shadow-color); }
+  &--busy { opacity: 0.55; }
+  &--done { background: var(--tf-mint-tint); }
+  &--done &__title { color: var(--tf-ink-soft); text-decoration: line-through; text-decoration-thickness: 2px; }
+
+  &__main { min-width: 0; }
+  &__title { display: block; font-weight: 700; font-size: 1.0625rem; color: var(--tf-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration-color: var(--tf-edge); }
+  &__time { margin-top: 2px; }
+  &__description { margin-top: 2px; color: var(--tf-ink-soft); font-size: var(--tf-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  // Fixed columns so priority, status and deadline line up from one row to the next.
+  &__meta { display: grid; grid-template-columns: 22px 7.5rem 10.5rem; align-items: center; column-gap: var(--tf-space-3); justify-content: end; }
+  &__menu { min-width: 44px; min-height: 44px; padding: 0; }
+}
+
+.check {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer; transition: transform 200ms var(--tf-ease-pop);
+  &:hover:not(:disabled) { transform: scale(1.18) rotate(-6deg); }
+  &:active:not(:disabled) { transform: scale(0.9); }
+  &:disabled { cursor: progress; }
+}
+
+.sk { height: 76px; border-radius: var(--tf-radius-sticker); }
+
+.pager { display: flex; justify-content: flex-end; margin-top: var(--tf-space-6); }
+
+:host ::ng-deep .menu-danger { font-weight: 700; }
+
+// Tablet and below: filters collapse behind a button and rows become two lines.
+@media (max-width: 767.98px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr); padding: var(--tf-space-3) var(--tf-space-4); }
+  .toolbar__search, .toolbar__filters, .toolbar__sort { grid-column: 1; grid-row: auto; justify-self: stretch; }
+  .toolbar__toggle { display: inline-flex; align-items: center; gap: var(--tf-space-2); }
+  .toolbar__filters { display: none; flex-direction: column; align-items: stretch; }
+  .toolbar__filters--open { display: flex; }
+  .control, .control--range { width: 100%; }
+  .toolbar__sort { flex-wrap: nowrap; }
+  .toolbar__sort .control--sort { width: auto; flex: 1; min-width: 0; }
+
+  .row {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    grid-template-areas: 'check main menu' '. meta meta';
+    row-gap: var(--tf-space-1);
+  }
+  .check { grid-area: check; }
+  .row__main { grid-area: main; }
+  .row__menu { grid-area: menu; }
+  .row__meta { grid-area: meta; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--tf-space-2) var(--tf-space-4); }
+  .row__status { display: none; }
+  .pager { justify-content: center; }
+}

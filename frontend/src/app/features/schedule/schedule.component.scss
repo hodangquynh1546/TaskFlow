@@ -1,0 +1,70 @@
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tf-space-4); margin-bottom: var(--tf-space-4); }
+.nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-2); }
+.nav__step { min-width: 42px; padding-inline: 0; }
+.nav__picker { width: 15.5rem; }
+
+.summary { min-height: 1.5rem; margin-bottom: var(--tf-space-4); color: var(--tf-ink-soft); font-weight: 500; }
+.note { margin-bottom: var(--tf-space-3); font-size: var(--tf-text-small); font-weight: 600; }
+
+.board { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--tf-space-8); align-items: start; }
+.board__panel { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
+.board__scroll { max-height: 70vh; overflow-y: auto; }
+
+.timeline { position: relative; margin: 16px var(--tf-space-4) 16px 4rem; } // room above the first hour so its label is not clipped
+
+.hour { position: absolute; left: 0; right: 0; height: 84px; border-top: 2px dashed var(--tf-line); }
+.hour__label { position: absolute; left: -3.75rem; top: -0.75rem; width: 3.2rem; text-align: right; color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-weight: 600; font-variant-numeric: tabular-nums; background: var(--tf-paper); }
+.hour__slot { position: absolute; inset: 0; width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left; padding: 0 var(--tf-space-3); transition: background-color 160ms ease; }
+.hour__slot:hover { background: var(--tf-tangerine-tint); border-radius: var(--tf-radius-control); }
+.hour__add { opacity: 0; transform: translateY(4px); display: inline-block; font-size: var(--tf-text-caption); font-weight: 700; transition: opacity 160ms ease, transform 200ms var(--tf-ease-pop); }
+.hour__slot:hover .hour__add { opacity: 1; transform: none; }
+
+// Blocks are stickers coloured by status. Title and time are always printed, so colour is never alone;
+// high priority gets a corner flag, and an estimated length (no duration set) is drawn with a dashed outline.
+.block {
+  position: absolute; z-index: 2; display: flex; flex-direction: column; gap: 1px; padding: 3px var(--tf-space-3);
+  overflow: hidden; border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-control);
+  background: var(--tf-sky); color: var(--tf-on-color); text-decoration: none; font-size: var(--tf-text-small); line-height: 1.25;
+  box-shadow: var(--tf-shadow-small);
+  animation: block-in 460ms var(--tf-ease-pop) both; animation-delay: calc(var(--i, 0) * 55ms);
+  transition: transform 160ms var(--tf-ease-pop), box-shadow 160ms ease;
+}
+.block:hover { transform: translate(-1px, -1px) scale(1.01); box-shadow: 3px 3px 0 var(--tf-shadow-color); z-index: 4; }
+.block--InProgress { background: var(--tf-lemon); }
+.block--Completed { background: var(--tf-mint); }
+.block--Completed .block__title { text-decoration: line-through; text-decoration-thickness: 2px; }
+.block--short { flex-direction: row; align-items: center; gap: var(--tf-space-2); padding-block: 0; }
+.block--high::after { content: ''; position: absolute; top: -2px; right: -2px; width: 14px; height: 14px; background: var(--tf-bubblegum); border: 2px solid var(--tf-edge); border-radius: 0 var(--tf-radius-control) 0 8px; }
+.block--estimated { border-style: dashed; }
+.block__title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.block__time { font-size: var(--tf-text-caption); font-weight: 500; font-variant-numeric: tabular-nums; opacity: 0.85; }
+
+@keyframes block-in {
+  from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 28px)) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+.now { position: absolute; z-index: 3; left: -0.5rem; right: 0; height: 0; border-top: 3px solid var(--tf-bubblegum); pointer-events: none; }
+.now__dot { position: absolute; left: -6px; top: -9px; width: 14px; height: 14px; border: 2px solid var(--tf-edge); border-radius: 50%; background: var(--tf-bubblegum); }
+
+.unscheduled { padding: var(--tf-space-4) var(--tf-space-4) var(--tf-space-2); background: var(--tf-lemon-tint); }
+.unscheduled__title { font-size: var(--tf-text-h3); padding-bottom: var(--tf-space-2); }
+.unscheduled__empty { padding: var(--tf-space-2) 0 var(--tf-space-3); color: var(--tf-ink-soft); }
+.unscheduled__list { list-style: none; margin: 0; padding: 0; }
+.unscheduled__item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--tf-space-1) var(--tf-space-3); align-items: center; padding: var(--tf-space-3) 0; border-top: 2px dashed var(--tf-line); }
+.unscheduled__item a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--tf-ink); }
+.unscheduled__item tf-due { grid-column: 2; }
+
+.skeleton { display: flex; flex-direction: column; gap: var(--tf-space-3); }
+.sk { height: 64px; border-radius: var(--tf-radius-sticker); }
+
+@media (max-width: 1023.98px) {
+  .board { grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-6); }
+  .board__scroll { max-height: 60vh; }
+}
+
+@media (max-width: 599.98px) {
+  .nav__picker { width: 100%; order: -1; }
+  .nav > button { min-height: 44px; }
+  .timeline { margin-left: 3.5rem; }
+}

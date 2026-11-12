@@ -1,0 +1,22 @@
+.head { margin-bottom: var(--tf-space-6); }
+
+// Two panels side by side; the second is a different tint so they do not read as a pair of identical cards.
+.sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 28rem)); gap: var(--tf-space-8); align-items: start; }
+.section { padding: var(--tf-space-8); box-shadow: var(--tf-shadow-panel); }
+.section:nth-child(2) { background: var(--tf-sky-tint); }
+.section__title { font-size: var(--tf-text-h3); margin-bottom: var(--tf-space-4); }
+
+.form-error {
+  margin-bottom: var(--tf-space-4);
+  padding: var(--tf-space-3) var(--tf-space-4);
+  border: 2px solid var(--tf-edge);
+  background: var(--tf-bubblegum-tint);
+  border-radius: var(--tf-radius-sticker);
+  font-weight: 500;
+}
+
+.skeleton { display: flex; flex-direction: column; gap: var(--tf-space-4); max-width: 28rem; }
+.sk { height: 44px; border-radius: var(--tf-radius-control); }
+.sk--short { width: 40%; }
+
+@media (max-width: 599.98px) { .section { padding: var(--tf-space-4); box-shadow: var(--tf-shadow-small); } }

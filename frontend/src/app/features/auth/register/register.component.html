@@ -1,0 +1,37 @@
+<h1 class="title">{{ 'auth.register.title' | t }}</h1>
+<p class="lead">{{ 'auth.register.lead' | t }}</p>
+
+<form nz-form nzLayout="vertical" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <nz-form-item>
+    <nz-form-label nzFor="fullName" nzRequired>{{ 'auth.field.fullName' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="fullNameError">
+      <input nz-input id="fullName" formControlName="fullName" autocomplete="name" autofocus />
+      <ng-template #fullNameError>{{ errorText('fullName') }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  <nz-form-item>
+    <nz-form-label nzFor="email" nzRequired>{{ 'auth.field.email' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="emailError">
+      <input nz-input id="email" type="email" formControlName="email" autocomplete="username" inputmode="email" />
+      <ng-template #emailError>{{ errorText('email') }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  <nz-form-item>
+    <nz-form-label nzFor="password" nzRequired>{{ 'auth.field.password' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="passwordError">
+      <input nz-input id="password" type="password" formControlName="password" autocomplete="new-password" />
+      <ng-template #passwordError>{{ errorText('password') }}</ng-template>
+    </nz-form-control>
+    <tf-password-rules [password]="password()" />
+  </nz-form-item>
+
+  @if (formError()) {
+    <p class="form-error" role="alert">{{ formError() }}</p>
+  }
+
+  <button nz-button nzType="primary" nzSize="large" nzBlock type="submit" [nzLoading]="submitting()">{{ 'auth.register.submit' | t }}</button>
+</form>
+
+<p class="switch">{{ 'auth.register.haveAccount' | t }} <a routerLink="/login">{{ 'auth.register.link' | t }}</a></p>

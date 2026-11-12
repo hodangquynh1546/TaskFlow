@@ -1,0 +1,100 @@
+<form nz-form nzLayout="vertical" [formGroup]="form" (ngSubmit)="submit()" (keydown.enter)="keepPickerEnterFromSubmitting($event)" novalidate class="task-form tf-panel">
+  <nz-form-item>
+    <nz-form-label nzFor="title" nzRequired>{{ 'form.title' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="titleError">
+      <input nz-input id="title" formControlName="title" autocomplete="off" autofocus />
+      <ng-template #titleError>{{ errorText('title') }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  <nz-form-item>
+    <nz-form-label nzFor="description">{{ 'form.description' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="descriptionError">
+      <textarea nz-input id="description" formControlName="description" [nzAutosize]="{ minRows: 4, maxRows: 12 }"></textarea>
+      <ng-template #descriptionError>{{ errorText('description') }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  <div class="two-col">
+    <nz-form-item>
+      <nz-form-label id="priority-label">{{ 'form.priority' | t }}</nz-form-label>
+      <nz-form-control>
+        <nz-radio-group formControlName="priority" aria-labelledby="priority-label">
+          @for (priority of priorities; track priority) {
+            <label nz-radio [nzValue]="priority">{{ i18n.t(priorityKeys[priority]) }}</label>
+          }
+        </nz-radio-group>
+      </nz-form-control>
+    </nz-form-item>
+
+    <nz-form-item>
+      <nz-form-label nzFor="status">{{ 'form.status' | t }}</nz-form-label>
+      <nz-form-control>
+        <nz-select nzId="status" formControlName="status">
+          @for (status of statuses; track status) {
+            <nz-option [nzValue]="status" [nzLabel]="i18n.t(statusKeys[status])" />
+          }
+        </nz-select>
+      </nz-form-control>
+    </nz-form-item>
+  </div>
+
+  <div class="two-col">
+    <nz-form-item>
+      <nz-form-label nzFor="startDate">{{ 'form.startDate' | t }}</nz-form-label>
+      <nz-form-control [nzErrorTip]="startError" [nzValidateStatus]="startInvalid() ? 'error' : ''">
+        <nz-date-picker nzId="startDate" formControlName="startDate" [nzFormat]="'format.date' | t" [nzPlaceHolder]="'form.pickDate' | t" class="full" />
+        <ng-template #startError>{{ errorText('startDate') }}</ng-template>
+      </nz-form-control>
+    </nz-form-item>
+
+    <nz-form-item>
+      <nz-form-label nzFor="startTime">{{ 'form.startTime' | t }}</nz-form-label>
+      <nz-form-control [nzErrorTip]="timeError">
+        <input nz-input id="startTime" type="time" formControlName="startTime" step="300" />
+        <ng-template #timeError>{{ errorText('startTime') }}</ng-template>
+      </nz-form-control>
+    </nz-form-item>
+  </div>
+
+  <nz-form-item>
+    <nz-form-label id="duration-label">{{ 'form.duration' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="durationErr" [nzValidateStatus]="durationError() ? 'error' : ''" [nzExtra]="endHint()">
+      <nz-radio-group formControlName="durationChoice" nzButtonStyle="outline" aria-labelledby="duration-label" class="durations">
+        <label nz-radio-button nzValue="none">{{ 'form.durationNone' | t }}</label>
+        @for (minutes of presets; track minutes) {
+          <label nz-radio-button [nzValue]="'' + minutes">{{ formatDuration(minutes) }}</label>
+        }
+        <label nz-radio-button nzValue="custom">{{ 'form.durationCustom' | t }}</label>
+      </nz-radio-group>
+      <ng-template #durationErr>{{ durationError() }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  @if (customChosen()) {
+    <nz-form-item>
+      <nz-form-label nzFor="customMinutes">{{ 'form.minutes' | t }}</nz-form-label>
+      <nz-form-control [nzErrorTip]="customError" [nzValidateStatus]="customInvalid() ? 'error' : ''">
+        <nz-input-number nzId="customMinutes" formControlName="customMinutes" [nzMin]="1" [nzMax]="maxDuration" [nzStep]="5" [nzPrecision]="0" class="minutes" />
+        <ng-template #customError>{{ errorText('customMinutes') }}</ng-template>
+      </nz-form-control>
+    </nz-form-item>
+  }
+
+  <nz-form-item>
+    <nz-form-label nzFor="dueDate">{{ 'form.dueDate' | t }}</nz-form-label>
+    <nz-form-control [nzErrorTip]="dueError" [nzValidateStatus]="form.hasError('dateOrder') ? 'error' : ''">
+      <nz-date-picker nzId="dueDate" formControlName="dueDate" [nzFormat]="'format.date' | t" [nzPlaceHolder]="'form.pickDate' | t" class="full due" />
+      <ng-template #dueError>{{ errorText('dueDate') }}</ng-template>
+    </nz-form-control>
+  </nz-form-item>
+
+  @if (formError()) {
+    <p class="form-error" role="alert">{{ formError() }}</p>
+  }
+
+  <div class="actions">
+    <button type="button" nz-button (click)="cancelled.emit()">{{ 'common.cancel' | t }}</button>
+    <button type="submit" nz-button nzType="primary" nzSize="large" [nzLoading]="saving()">{{ submitLabel() }}</button>
+  </div>
+</form>

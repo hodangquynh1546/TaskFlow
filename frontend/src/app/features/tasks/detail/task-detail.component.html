@@ -1,0 +1,78 @@
+<a class="tf-back" routerLink="/tasks"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ 'tasks.title' | t }}</a>
+
+@switch (resource.state()) {
+  @case ('notFound') { <tf-task-missing /> }
+
+  @case ('error') {
+    <tf-error-state [message]="resource.error()?.message ?? ('detail.loadError' | t)" (retry)="resource.reload()" />
+  }
+
+  @case ('loading') {
+    <div class="skeleton" role="status" aria-busy="true">
+      <span class="tf-visually-hidden">{{ 'detail.loading' | t }}</span>
+      <span class="tf-skeleton sk sk--title"></span><span class="tf-skeleton sk sk--block"></span><span class="tf-skeleton sk sk--block"></span>
+    </div>
+  }
+
+  @case ('ready') {
+    @if (resource.task(); as task) {
+      <header class="tf-page-header">
+        <h1 class="title">{{ task.title }}</h1>
+        <div class="actions">
+          <a nz-button [routerLink]="['/tasks', task.id, 'edit']">
+            <span nz-icon nzType="edit" nzTheme="outline" aria-hidden="true"></span>{{ 'common.edit' | t }}
+          </a>
+          <button type="button" nz-button nzDanger [disabled]="busy()" (click)="remove()">
+            <span nz-icon nzType="delete" nzTheme="outline" aria-hidden="true"></span>{{ 'common.delete' | t }}
+          </button>
+        </div>
+      </header>
+
+      <dl class="facts">
+        <div class="fact fact--wide tf-sticker tf-pop" style="--i: 0">
+          <dt id="status-label">{{ 'form.status' | t }}</dt>
+          <dd>
+            <nz-radio-group nzButtonStyle="solid" aria-labelledby="status-label" [nzDisabled]="busy()"
+                            [ngModel]="task.status" (ngModelChange)="changeStatus($event)">
+              @for (status of statuses; track status) {
+                <label nz-radio-button [nzValue]="status">{{ i18n.t(statusKeys[status]) }}</label>
+              }
+            </nz-radio-group>
+          </dd>
+        </div>
+
+        <div class="fact tf-sticker tf-pop" style="--i: 1">
+          <dt>{{ 'form.priority' | t }}</dt>
+          <dd><tf-priority [priority]="task.priority" [showLabel]="true" /></dd>
+        </div>
+
+        <div class="fact tf-sticker tf-pop" style="--i: 2">
+          <dt>{{ 'detail.planned' | t }}</dt>
+          <dd>
+            @if (task.startDate || task.durationMinutes !== null) {
+              <tf-time-block [task]="task" />
+            } @else {
+              {{ 'detail.unscheduled' | t }}
+            }
+          </dd>
+        </div>
+
+        <div class="fact tf-sticker tf-pop" style="--i: 3">
+          <dt>{{ 'form.dueDate' | t }}</dt>
+          <dd><tf-due [dueDate]="task.dueDate" [status]="task.status" /></dd>
+        </div>
+      </dl>
+
+      <section class="description tf-panel tf-rise" style="--i: 4" aria-labelledby="description-heading">
+        <h2 id="description-heading" class="section-title">{{ 'detail.description' | t }}</h2>
+        @if (task.description) {
+          <p class="description__text">{{ task.description }}</p>
+        } @else {
+          <p class="description__empty">{{ 'detail.noDescription' | t }}</p>
+        }
+      </section>
+
+      <p class="stamps">{{ 'detail.stamps' | t: { created: i18n.formatDateTime(task.createdAt), updated: i18n.formatDateTime(task.updatedAt) } }}</p>
+    }
+  }
+}

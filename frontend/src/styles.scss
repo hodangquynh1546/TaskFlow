@@ -1,0 +1,397 @@
+// Global base. Tokens come from theme.less as --tf-* custom properties (light and dark sets).
+// Look: "Tí and the sticker board" (docs/ui-design/design-plan-v2.md): ink outlines, hard offset shadows, status colours.
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--tf-canvas);
+  // A planner sheet: a faint dot grid, not a gradient wash.
+  background-image: radial-gradient(var(--tf-line) 1.2px, transparent 1.3px);
+  background-size: 24px 24px;
+  color: var(--tf-ink);
+  font-family: var(--tf-font-body);
+  font-size: var(--tf-text-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--tf-font-display);
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+h1 { font-size: var(--tf-text-h1); }
+h2 { font-size: var(--tf-text-h2); }
+h3 { font-size: var(--tf-text-h3); }
+
+p { margin: 0; }
+
+a {
+  color: var(--tf-link);
+  text-underline-offset: 3px;
+}
+
+// Keyboard focus is always visible; mouse clicks do not draw the ring.
+:focus-visible {
+  outline: 3px solid var(--tf-link);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.tf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.tf-skip-link {
+  position: absolute;
+  left: var(--tf-space-4);
+  top: -5rem;
+  z-index: 1100;
+  padding: var(--tf-space-2) var(--tf-space-4);
+  background: var(--tf-paper);
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-pill);
+  color: var(--tf-ink);
+  font-weight: 600;
+
+  &:focus {
+    top: var(--tf-space-2);
+  }
+}
+
+// ---- Shared furniture -----------------------------------------------------------------------------------------
+
+// The signature shape: a sticker with an ink outline and a hard shadow.
+.tf-sticker {
+  background: var(--tf-paper);
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-sticker);
+  box-shadow: var(--tf-shadow-sticker);
+}
+
+.tf-panel {
+  background: var(--tf-paper);
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-panel);
+  box-shadow: var(--tf-shadow-small);
+}
+
+.tf-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  min-height: 44px;
+  margin-bottom: var(--tf-space-2);
+  color: var(--tf-ink-soft);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover { color: var(--tf-ink); }
+}
+
+.tf-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tf-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--tf-space-6);
+}
+
+// Rises into place. Used once per screen (the first load), staggered with --i; never on scroll.
+.tf-rise {
+  animation: tf-rise 520ms var(--tf-ease-out) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.tf-pop {
+  animation: tf-pop 480ms var(--tf-ease-pop) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes tf-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tf-pop {
+  from { opacity: 0; transform: scale(0.88) translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+// Skeleton: a light sweep that holds the layout while data loads.
+.tf-skeleton {
+  display: block;
+  border-radius: var(--tf-radius-control);
+  background: linear-gradient(100deg, var(--tf-skeleton-a) 30%, var(--tf-skeleton-b) 50%, var(--tf-skeleton-a) 70%);
+  background-size: 300% 100%;
+  animation: tf-shimmer 1.5s linear infinite;
+}
+
+@keyframes tf-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+// Theme switch cross-fades colours instead of snapping; the class lives for 300ms (ThemeService).
+html.tf-theme-fade,
+html.tf-theme-fade *,
+html.tf-theme-fade *::before,
+html.tf-theme-fade *::after {
+  transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease, box-shadow 250ms ease !important;
+}
+
+// Route changes (View Transitions API): the shell stays put, only the page content slides and fades.
+.tf-main-transition { view-transition-name: tf-main; }
+.tf-chrome { view-transition-name: tf-chrome; }
+
+::view-transition-group(root) { animation-duration: 0s; }
+::view-transition-old(tf-main) { animation: tf-leave 140ms ease-in both; }
+::view-transition-new(tf-main) { animation: tf-enter 320ms var(--tf-ease-out) both; }
+
+@keyframes tf-leave { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes tf-enter { from { opacity: 0; transform: translateY(12px); } }
+
+// ---- NG-ZORRO, restyled -----------------------------------------------------------------------------------------
+
+// Buttons are stickers: ink outline, hard shadow that collapses when pressed.
+.ant-btn {
+  font-family: var(--tf-font-body);
+  font-weight: 600;
+  border-width: 2px;
+  border-color: var(--tf-edge);
+  border-radius: var(--tf-radius-pill);
+  color: var(--tf-ink);
+  background: var(--tf-paper);
+  box-shadow: var(--tf-shadow-small);
+  transition: transform 140ms var(--tf-ease-pop), box-shadow 140ms ease, background-color 160ms ease;
+
+  &:hover:not([disabled]),
+  &:focus-visible:not([disabled]) {
+    color: var(--tf-ink);
+    border-color: var(--tf-edge);
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--tf-shadow-color);
+  }
+
+  &:active:not([disabled]) {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 var(--tf-shadow-color);
+  }
+
+  &[disabled] {
+    opacity: 0.55;
+    box-shadow: none;
+    color: var(--tf-ink-soft);
+    background: var(--tf-paper);
+    border-color: var(--tf-line);
+  }
+}
+
+.ant-btn-primary,
+.ant-btn-primary:hover:not([disabled]),
+.ant-btn-primary:focus-visible:not([disabled]) {
+  background: var(--tf-tangerine);
+  color: var(--tf-on-color);
+}
+
+.ant-btn-primary[disabled] {
+  background: var(--tf-tangerine-tint);
+}
+
+.ant-btn-dangerous,
+.ant-btn-dangerous:hover:not([disabled]) {
+  background: var(--tf-bubblegum);
+  color: var(--tf-on-color);
+  border-color: var(--tf-edge);
+}
+
+// Ghost-looking buttons (menu toggle, icon-only) carry no shadow.
+.ant-btn-text,
+.ant-btn-link {
+  box-shadow: none;
+  border-color: transparent;
+  background: transparent;
+
+  &:hover:not([disabled]),
+  &:focus-visible:not([disabled]) {
+    background: var(--tf-line);
+    border-color: transparent;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+// Ant Design gives link-styled buttons (<a class="ant-btn">) a fixed line-height and lopsided padding that push the
+// label above centre. Centre them the same way real <button>s are.
+a.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  line-height: 1.5;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-picker {
+  border-width: 2px;
+  border-radius: var(--tf-radius-control);
+  background: var(--tf-paper);
+  color: var(--tf-ink);
+}
+
+.ant-input::placeholder { color: var(--tf-ink-soft); opacity: 0.75; }
+
+.ant-form-item-label > label {
+  color: var(--tf-ink);
+  font-weight: 600;
+}
+
+// An error message replaces the item's bottom margin, which left it touching the next label.
+.ant-form-item-with-help .ant-form-item-explain {
+  padding-bottom: var(--tf-space-3);
+}
+
+.ant-form-item-explain-error { color: var(--tf-ink); font-weight: 500; }
+
+// Overlays are the only things that float, so they take the biggest hard shadow.
+.ant-dropdown-menu,
+.ant-select-dropdown,
+.ant-picker-dropdown .ant-picker-panel-container,
+.ant-modal-content {
+  background: var(--tf-paper);
+  color: var(--tf-ink);
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-sticker);
+  box-shadow: var(--tf-shadow-panel);
+}
+
+.ant-modal-content { border-radius: var(--tf-radius-panel); }
+.ant-modal-title,
+.ant-modal-header { background: transparent; color: var(--tf-ink); font-family: var(--tf-font-display); font-weight: 800; }
+.ant-modal-footer { border-top: 0; }
+.ant-modal-confirm-title { font-family: var(--tf-font-display); font-weight: 800; color: var(--tf-ink); }
+.ant-modal-confirm-content { color: var(--tf-ink-soft); }
+
+.ant-dropdown-menu-item,
+.ant-select-item { color: var(--tf-ink); border-radius: 8px; }
+.ant-dropdown-menu-item:hover,
+.ant-select-item-option-active:not(.ant-select-item-option-disabled) { background: var(--tf-sky-tint); }
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) { background: var(--tf-tangerine-tint); color: var(--tf-ink); font-weight: 600; }
+
+.ant-message-notice-content {
+  padding: 10px 18px;
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-pill);
+  background: var(--tf-paper);
+  color: var(--tf-ink);
+  font-weight: 600;
+  box-shadow: var(--tf-shadow-sticker);
+}
+
+// Duration presets and other radio buttons become separate pills instead of a joined bar.
+.ant-radio-group-outline .ant-radio-button-wrapper,
+.ant-radio-button-wrapper {
+  height: 40px;
+  line-height: 36px;
+  margin-right: var(--tf-space-2);
+  margin-bottom: var(--tf-space-2);
+  border-width: 2px;
+  border-radius: var(--tf-radius-pill) !important;
+  border-color: var(--tf-edge);
+  background: var(--tf-paper);
+  color: var(--tf-ink);
+  font-weight: 500;
+  transition: transform 140ms var(--tf-ease-pop), background-color 160ms ease;
+
+  &::before { display: none !important; }
+  &:hover { color: var(--tf-ink); transform: translateY(-1px); }
+  &:not(:first-child)::before { display: none; }
+}
+
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  background: var(--tf-tangerine);
+  border-color: var(--tf-edge);
+  color: var(--tf-on-color);
+  font-weight: 700;
+  box-shadow: var(--tf-shadow-small);
+
+  &:hover,
+  &:focus-within { color: var(--tf-on-color); background: var(--tf-tangerine); border-color: var(--tf-edge); }
+}
+
+.ant-radio-inner { border-width: 2px; border-color: var(--tf-edge); background: var(--tf-paper); }
+.ant-radio-checked .ant-radio-inner { border-color: var(--tf-edge); }
+.ant-radio-inner::after { background-color: var(--tf-edge); }
+
+.ant-checkbox-inner { border-width: 2px; border-color: var(--tf-edge); border-radius: 6px; background: var(--tf-paper); }
+.ant-checkbox-checked .ant-checkbox-inner { background: var(--tf-tangerine); border-color: var(--tf-edge); }
+.ant-checkbox-checked .ant-checkbox-inner::after { border-color: var(--tf-on-color); }
+
+.ant-pagination-item,
+.ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination-next .ant-pagination-item-link {
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-pill);
+  background: var(--tf-paper);
+}
+.ant-pagination-item a { color: var(--tf-ink); font-weight: 600; }
+.ant-pagination-item-active { background: var(--tf-tangerine); }
+.ant-pagination-item-active a { color: var(--tf-on-color); }
+
+.ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before { border-color: var(--tf-edge); }
+.ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner { background: var(--tf-tangerine); color: var(--tf-on-color); font-weight: 700; }
+.ant-picker-panel { background: var(--tf-paper); border-color: var(--tf-line); }
+.ant-picker-header, .ant-picker-header button { color: var(--tf-ink); }
+.ant-picker-content th, .ant-picker-cell { color: var(--tf-ink-soft); }
+.ant-picker-cell-in-view { color: var(--tf-ink); }
+
+.ant-skeleton-element .ant-skeleton-input { background: var(--tf-skeleton-a); }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

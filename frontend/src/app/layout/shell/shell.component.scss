@@ -1,0 +1,131 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--tf-sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  padding: var(--tf-space-4) var(--tf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--tf-space-8);
+  view-transition-name: tf-side;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  padding: var(--tf-space-2) var(--tf-space-2);
+  font-family: var(--tf-font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--tf-ink);
+  text-decoration: none;
+
+  &__mark { flex: none; transition: transform 300ms var(--tf-ease-pop); }
+  &:hover &__mark { transform: rotate(-10deg) scale(1.1); }
+}
+
+.brand--header { display: none; font-size: 1.35rem; }
+
+.column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--tf-space-3);
+  height: var(--tf-header-height);
+  padding: 0 var(--tf-space-6);
+  background: color-mix(in srgb, var(--tf-canvas) 88%, transparent);
+  backdrop-filter: blur(6px);
+  view-transition-name: tf-head;
+}
+
+.spacer { flex: 1; }
+
+.create {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  min-height: 44px;
+  padding: 0 var(--tf-space-4);
+  text-decoration: none;
+}
+
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tf-space-2);
+  min-height: 44px;
+  padding: 0 var(--tf-space-2) 0 var(--tf-space-1);
+  border: 2px solid var(--tf-edge);
+  border-radius: var(--tf-radius-pill);
+  background: var(--tf-paper);
+  color: var(--tf-ink);
+  font: 600 var(--tf-text-small) var(--tf-font-body);
+  cursor: pointer;
+  box-shadow: var(--tf-shadow-small);
+  transition: transform 140ms var(--tf-ease-pop), box-shadow 140ms ease;
+
+  &:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--tf-shadow-color); }
+  &:active { transform: translate(2px, 2px); box-shadow: none; }
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--tf-lemon);
+  border: 2px solid var(--tf-edge);
+  color: var(--tf-on-color);
+  font-family: var(--tf-font-display);
+  font-weight: 800;
+  font-size: 0.8125rem;
+}
+
+.account { padding: var(--tf-space-2) var(--tf-space-4); &__name { font-weight: 700; } &__email { color: var(--tf-ink-soft); font-size: var(--tf-text-small); } }
+
+.content {
+  flex: 1;
+  padding: var(--tf-space-2) var(--tf-space-6) var(--tf-space-12);
+  outline: none;
+}
+
+// Tablet: icon-only sidebar.
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .shell { grid-template-columns: 88px minmax(0, 1fr); }
+  .sidebar { padding-inline: var(--tf-space-3); }
+  .brand__full { display: none; }
+  .brand { justify-content: center; padding: var(--tf-space-2) 0; }
+}
+
+// Phone: bottom tab bar replaces the sidebar; the create button moves into the tab bar.
+@media (max-width: 767.98px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; }
+  .brand--header { display: inline-flex; }
+  .create,
+  .user__name,
+  .user [nz-icon] { display: none; }
+  .user { padding: 0 var(--tf-space-1); }
+  .header { padding: 0 var(--tf-space-4); }
+  .content { padding: var(--tf-space-2) var(--tf-space-4) calc(var(--tf-tabbar-height) + var(--tf-space-8)); }
+}
+
+@media (min-width: 1024px) {
+  .content { padding-inline: var(--tf-space-8); }
+}

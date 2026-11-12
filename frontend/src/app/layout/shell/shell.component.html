@@ -1,0 +1,61 @@
+<a class="tf-skip-link" href="#main" (click)="$event.preventDefault(); main.focus()">{{ 'nav.skip' | t }}</a>
+
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/" [attr.aria-label]="'nav.home' | t">
+      <svg class="brand__mark" viewBox="0 0 32 36" width="30" height="34" aria-hidden="true" focusable="false">
+        <path d="M16 3C21 11 28 17 28 24c0 6-5 9-12 9S4 30 4 24C4 17 11 11 16 3z" fill="var(--tf-tangerine)" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+        <circle cx="12" cy="24" r="2.2" fill="currentColor" /><circle cx="20" cy="24" r="2.2" fill="currentColor" />
+      </svg>
+      <span class="brand__full">TaskFlow</span>
+    </a>
+    <tf-nav-list />
+  </aside>
+
+  <div class="column">
+    <header class="header">
+      <a class="brand brand--header" routerLink="/" [attr.aria-label]="'nav.home' | t">
+        <svg class="brand__mark" viewBox="0 0 32 36" width="26" height="30" aria-hidden="true" focusable="false">
+          <path d="M16 3C21 11 28 17 28 24c0 6-5 9-12 9S4 30 4 24C4 17 11 11 16 3z" fill="var(--tf-tangerine)" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" />
+          <circle cx="12" cy="24" r="2.2" fill="currentColor" /><circle cx="20" cy="24" r="2.2" fill="currentColor" />
+        </svg>
+        <span>TaskFlow</span>
+      </a>
+
+      <span class="spacer"></span>
+
+      <a class="create ant-btn ant-btn-primary" routerLink="/tasks/new">
+        <span nz-icon nzType="plus" nzTheme="outline" aria-hidden="true"></span>
+        <span class="create__label">{{ 'common.create' | t }}</span>
+      </a>
+
+      <tf-prefs />
+
+      <button class="user" type="button" nz-dropdown nzTrigger="click" nzPlacement="bottomRight" [nzDropdownMenu]="userMenu"
+              [attr.aria-label]="'shell.account' | t: { name: user()?.fullName ?? '' }">
+        <span class="avatar" aria-hidden="true">{{ initials() }}</span>
+        <span class="user__name">{{ user()?.fullName }}</span>
+        <span nz-icon nzType="down" nzTheme="outline" aria-hidden="true"></span>
+      </button>
+      <nz-dropdown-menu #userMenu="nzDropdownMenu">
+        <ul nz-menu>
+          @if (user(); as u) {
+            <li class="account">
+              <p class="account__name">{{ u.fullName }}</p>
+              <p class="account__email">{{ u.email }}</p>
+            </li>
+            <li nz-menu-divider></li>
+          }
+          <li nz-menu-item routerLink="/profile">{{ 'nav.profile' | t }}</li>
+          <li nz-menu-item (click)="signOut()">{{ 'shell.signOut' | t }}</li>
+        </ul>
+      </nz-dropdown-menu>
+    </header>
+
+    <main id="main" class="content tf-main-transition" tabindex="-1" #main>
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<tf-tab-bar />

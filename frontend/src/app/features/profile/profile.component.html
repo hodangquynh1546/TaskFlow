@@ -1,0 +1,83 @@
+<header class="head"><h1>{{ 'nav.profile' | t }}</h1></header>
+
+@switch (state()) {
+  @case ('loading') {
+    <div class="skeleton" role="status" aria-busy="true">
+      <span class="tf-visually-hidden">{{ 'profile.loading' | t }}</span>
+      <span class="tf-skeleton sk"></span><span class="tf-skeleton sk"></span><span class="tf-skeleton sk sk--short"></span>
+    </div>
+  }
+
+  @case ('error') {
+    <tf-error-state [message]="loadError()?.message ?? ('profile.loadError' | t)" (retry)="load()" />
+  }
+
+  @case ('ready') {
+    <div class="sections">
+      <section class="section tf-panel tf-pop" style="--i: 0" aria-labelledby="info-title">
+        <h2 id="info-title" class="section__title">{{ 'profile.info' | t }}</h2>
+
+        <form nz-form nzLayout="vertical" [formGroup]="infoForm" (ngSubmit)="saveInfo()" novalidate class="form">
+          <nz-form-item>
+            <nz-form-label nzFor="fullName" nzRequired>{{ 'auth.field.fullName' | t }}</nz-form-label>
+            <nz-form-control [nzErrorTip]="nameError">
+              <input nz-input id="fullName" formControlName="fullName" autocomplete="name" />
+              <ng-template #nameError>{{ infoText('fullName') }}</ng-template>
+            </nz-form-control>
+          </nz-form-item>
+
+          <nz-form-item>
+            <nz-form-label nzFor="email" nzRequired>{{ 'auth.field.email' | t }}</nz-form-label>
+            <nz-form-control [nzErrorTip]="emailError">
+              <input nz-input id="email" type="email" formControlName="email" autocomplete="email" inputmode="email" />
+              <ng-template #emailError>{{ infoText('email') }}</ng-template>
+            </nz-form-control>
+          </nz-form-item>
+
+          @if (emailChanged()) {
+            <nz-form-item>
+              <nz-form-label nzFor="emailPassword" nzRequired>{{ 'profile.currentPassword' | t }}</nz-form-label>
+              <nz-form-control [nzErrorTip]="emailPasswordError" [nzExtra]="'profile.emailPasswordHint' | t">
+                <input nz-input id="emailPassword" type="password" formControlName="currentPassword" autocomplete="current-password" />
+                <ng-template #emailPasswordError>{{ infoText('currentPassword') }}</ng-template>
+              </nz-form-control>
+            </nz-form-item>
+          }
+
+          @if (infoError()) {
+            <p class="form-error" role="alert">{{ infoError() }}</p>
+          }
+          <button nz-button nzType="primary" type="submit" [nzLoading]="savingInfo()">{{ 'common.save' | t }}</button>
+        </form>
+      </section>
+
+      <section class="section tf-panel tf-pop" style="--i: 1" aria-labelledby="password-title">
+        <h2 id="password-title" class="section__title">{{ 'profile.password' | t }}</h2>
+
+        <form nz-form nzLayout="vertical" [formGroup]="passwordForm" (ngSubmit)="savePassword()" novalidate class="form">
+          <nz-form-item>
+            <nz-form-label nzFor="currentPassword" nzRequired>{{ 'profile.currentPassword' | t }}</nz-form-label>
+            <nz-form-control [nzErrorTip]="currentError">
+              <input nz-input id="currentPassword" type="password" formControlName="currentPassword" autocomplete="current-password" />
+              <ng-template #currentError>{{ passwordText('currentPassword') }}</ng-template>
+            </nz-form-control>
+          </nz-form-item>
+
+          <nz-form-item>
+            <nz-form-label nzFor="newPassword" nzRequired>{{ 'profile.newPassword' | t }}</nz-form-label>
+            <nz-form-control [nzErrorTip]="newError">
+              <input nz-input id="newPassword" type="password" formControlName="newPassword" autocomplete="new-password" />
+              <ng-template #newError>{{ passwordText('newPassword') }}</ng-template>
+            </nz-form-control>
+            <tf-password-rules [password]="newPassword()" />
+          </nz-form-item>
+
+          @if (passwordError()) {
+            <p class="form-error" role="alert">{{ passwordError() }}</p>
+          }
+          <button nz-button nzType="primary" type="submit" [nzLoading]="savingPassword()">{{ 'profile.password' | t }}</button>
+        </form>
+      </section>
+    </div>
+  }
+}

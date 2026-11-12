@@ -1,0 +1,82 @@
+<header class="head">
+  <h1>{{ 'dashboard.title' | t }}</h1>
+</header>
+
+@switch (state()) {
+  @case ('loading') {
+    <div class="grid" role="status" aria-busy="true">
+      <span class="tf-visually-hidden">{{ 'dashboard.loading' | t }}</span>
+      <span class="tf-skeleton sk sk--hero"></span>
+      <span class="tf-skeleton sk sk--stat"></span>
+      <span class="tf-skeleton sk sk--list"></span>
+      <span class="tf-skeleton sk sk--list2"></span>
+    </div>
+  }
+
+  @case ('error') {
+    <tf-error-state [message]="error()?.message ?? ('dashboard.loadError' | t)" (retry)="retry()" />
+  }
+
+  @case ('ready') {
+    @if (data(); as d) {
+      @if (d.summary.total === 0) {
+        <tf-empty-state [title]="'dashboard.emptyTitle' | t" [description]="'dashboard.emptyDesc' | t"
+                        [actionLabel]="'common.create' | t" (action)="createTask()" />
+      } @else {
+        <div class="grid">
+          <section class="hero tf-panel tf-pop" style="--i: 0" aria-labelledby="hello-title">
+            <tf-mascot class="hero__ti" [mood]="mood()" [size]="120" [animated]="true" />
+            <div class="hero__text">
+              <h2 id="hello-title" class="hello">{{ greeting() }}</h2>
+              <p class="situation">{{ situation() }}</p>
+            </div>
+          </section>
+
+          <section class="stat tf-panel tf-pop" style="--i: 1" aria-labelledby="progress-title">
+            <p id="progress-title" class="stat__figure">
+              <tf-count [value]="d.summary.completed" /><span class="stat__total">/{{ d.summary.total }}</span>
+            </p>
+            <p class="stat__label">{{ 'dashboard.doneOf' | t }}</p>
+            <tf-progress-strip [summary]="d.summary" />
+            @if (d.summary.overdue > 0) {
+              <p class="overdue">
+                <span class="overdue__text">{{ 'dashboard.overdue' | t: { n: d.summary.overdue } }}</span>
+                <a routerLink="/tasks" [queryParams]="{ overdue: 'true' }">{{ 'dashboard.viewOverdue' | t }}</a>
+              </p>
+            }
+          </section>
+
+          <section class="list-panel list-panel--wide tf-panel tf-pop" style="--i: 2" aria-labelledby="upcoming-title">
+            <h2 id="upcoming-title" class="list-title">{{ 'dashboard.upcoming' | t }}</h2>
+            @if (d.upcoming.length === 0) {
+              <p class="list-empty">{{ 'dashboard.upcomingEmpty' | t }}</p>
+            } @else {
+              <ul class="list">
+                @for (task of d.upcoming; track task.id) {
+                  <li class="item">
+                    <tf-status [status]="task.status" [compact]="true" />
+                    <a class="item__title" [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
+                    <tf-due class="item__meta" [dueDate]="task.dueDate" [status]="task.status" />
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+
+          <section class="list-panel tf-panel tf-pop" style="--i: 3" aria-labelledby="recent-title">
+            <h2 id="recent-title" class="list-title">{{ 'dashboard.recent' | t }}</h2>
+            <ul class="list">
+              @for (task of d.recent; track task.id) {
+                <li class="item">
+                  <tf-status [status]="task.status" [compact]="true" />
+                  <a class="item__title" [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
+                  <span class="item__meta item__time">{{ updated(task) }}</span>
+                </li>
+              }
+            </ul>
+          </section>
+        </div>
+      }
+    }
+  }
+}

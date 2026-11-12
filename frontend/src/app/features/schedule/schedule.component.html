@@ -1,0 +1,91 @@
+<header class="head">
+  <h1>{{ 'nav.schedule' | t }}</h1>
+
+  <div class="nav" role="group" [attr.aria-label]="'schedule.pickDay' | t">
+    <button type="button" nz-button class="nav__step" [attr.aria-label]="'schedule.prev' | t" (click)="shift(-1)">
+      <span nz-icon nzType="left" nzTheme="outline" aria-hidden="true"></span>
+    </button>
+    <nz-date-picker class="nav__picker" [nzFormat]="'schedule.dateFormat' | t" [nzAllowClear]="false" [attr.aria-label]="'schedule.pickDay' | t"
+                    [ngModel]="selected()" (ngModelChange)="pick($event)" />
+    <button type="button" nz-button class="nav__step" [attr.aria-label]="'schedule.next' | t" (click)="shift(1)">
+      <span nz-icon nzType="right" nzTheme="outline" aria-hidden="true"></span>
+    </button>
+    <button type="button" nz-button [disabled]="isToday()" (click)="goToday()">{{ 'schedule.today' | t }}</button>
+    <button type="button" nz-button nzType="primary" (click)="createAt(null)">
+      <span nz-icon nzType="plus" nzTheme="outline" aria-hidden="true"></span>{{ 'schedule.add' | t }}
+    </button>
+  </div>
+</header>
+
+<p class="summary" aria-live="polite">{{ summary() }}</p>
+
+@switch (state()) {
+  @case ('loading') {
+    <div class="skeleton" role="status" aria-busy="true">
+      <span class="tf-visually-hidden">{{ 'schedule.loading' | t }}</span>
+      <span class="tf-skeleton sk"></span><span class="tf-skeleton sk"></span><span class="tf-skeleton sk"></span>
+    </div>
+  }
+
+  @case ('error') {
+    <tf-error-state [message]="error()?.message ?? ('schedule.loadError' | t)" (retry)="retry()" />
+  }
+
+  @case ('ready') {
+    @if (data(); as d) {
+      @if (d.truncated) {
+        <p class="note" role="status">{{ 'schedule.truncated' | t }}</p>
+      }
+
+      <div class="board">
+        <div class="board__panel tf-panel">
+          <div class="board__scroll" #scroller>
+            <div class="timeline" [style.height.px]="gridHeight()">
+              @for (hour of hours(); track hour) {
+                <div class="hour" [style.top.px]="hourTop(hour)">
+                  <span class="hour__label">{{ clock(hour * 60) }}</span>
+                  <button type="button" class="hour__slot" tabindex="-1" aria-hidden="true" (click)="createAt(hour * 60)">
+                    <span class="hour__add">+ {{ clock(hour * 60) }}</span>
+                  </button>
+                </div>
+              }
+
+              @for (block of layout().blocks; track block.task.id; let i = $index) {
+                <a class="block" [class]="'block block--' + block.task.status" [class.block--high]="block.task.priority === 'High'"
+                   [class.block--estimated]="block.estimated" [class.block--short]="isShort(block)"
+                   [routerLink]="['/tasks', block.task.id]" [attr.aria-label]="label(block)" [attr.title]="label(block)"
+                   [style.top.px]="top(block)" [style.height.px]="height(block)"
+                   [style.left.%]="(block.lane / block.lanes) * 100" [style.width.%]="100 / block.lanes"
+                   [style.--i]="i" [style.--dir]="direction()">
+                  <span class="block__title">{{ block.task.title }}</span>
+                  <span class="block__time">{{ clock(block.startMinute) }}–{{ clock(block.endMinute) }}</span>
+                </a>
+              }
+
+              @if (nowTop(); as top) {
+                <div class="now" [style.top.px]="top" aria-hidden="true"><span class="now__dot"></span></div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <aside class="unscheduled tf-panel" aria-labelledby="unscheduled-title">
+          <h2 id="unscheduled-title" class="unscheduled__title">{{ 'schedule.unscheduledTitle' | t }}</h2>
+          @if (d.unscheduledDue.length === 0) {
+            <p class="unscheduled__empty">{{ 'schedule.unscheduledEmpty' | t }}</p>
+          } @else {
+            <ul class="unscheduled__list">
+              @for (task of d.unscheduledDue; track task.id) {
+                <li class="unscheduled__item">
+                  <tf-status [status]="task.status" [compact]="true" />
+                  <a [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
+                  <tf-due [dueDate]="task.dueDate" [status]="task.status" />
+                </li>
+              }
+            </ul>
+          }
+        </aside>
+      </div>
+    }
+  }
+}

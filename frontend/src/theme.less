@@ -1,0 +1,172 @@
+// Design tokens: the single source of truth (docs/ui-design/design-plan-v2.md, "Tí và bảng dán").
+// This file (1) configures NG-ZORRO through its documented Less variables and
+// (2) exports the same values as CSS custom properties (--tf-*) for our own components, in a light and a dark set.
+// NG-ZORRO reads the colour variables as var(--tf-*) so one compiled stylesheet serves both themes.
+
+// ---- Palette (light) -----------------------------------------------------
+@ink-dark: #1f1b4d;       // text on coloured fills in BOTH themes; also light-mode text and borders
+@tangerine: #ff8a3d;      // primary action
+@sky: #7db8ff;            // Todo
+@lemon: #ffd84a;          // InProgress
+@mint: #5fe0a4;           // Completed
+@bubblegum: #ff7aae;      // high priority, overdue, errors
+
+@font-display: 'Baloo 2', 'Be Vietnam Pro', system-ui, sans-serif;
+@font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+// ---- NG-ZORRO ------------------------------------------------------------
+// Only the NG-ZORRO components we actually use: the full bundle is ~740 KB of CSS and would blow the budget.
+// If a component renders unstyled, add its `style/entry.less` here.
+@import 'ng-zorro-antd/style/default.less';
+@import 'ng-zorro-antd/style/patch.less';
+@import 'ng-zorro-antd/icon/style/entry.less';
+@import 'ng-zorro-antd/alert/style/entry.less';
+@import 'ng-zorro-antd/button/style/entry.less';
+@import 'ng-zorro-antd/checkbox/style/entry.less';
+@import 'ng-zorro-antd/date-picker/style/entry.less';
+@import 'ng-zorro-antd/divider/style/entry.less';
+@import 'ng-zorro-antd/drawer/style/entry.less';
+@import 'ng-zorro-antd/dropdown/style/entry.less';
+@import 'ng-zorro-antd/empty/style/entry.less';
+@import 'ng-zorro-antd/form/style/entry.less';
+@import 'ng-zorro-antd/grid/style/entry.less';
+@import 'ng-zorro-antd/input/style/entry.less';
+@import 'ng-zorro-antd/input-number/style/entry.less';
+@import 'ng-zorro-antd/menu/style/entry.less';
+@import 'ng-zorro-antd/message/style/entry.less';
+@import 'ng-zorro-antd/modal/style/entry.less';
+@import 'ng-zorro-antd/pagination/style/entry.less';
+@import 'ng-zorro-antd/popconfirm/style/entry.less';
+@import 'ng-zorro-antd/popover/style/entry.less';
+@import 'ng-zorro-antd/radio/style/entry.less';
+@import 'ng-zorro-antd/select/style/entry.less';
+@import 'ng-zorro-antd/skeleton/style/entry.less';
+@import 'ng-zorro-antd/spin/style/entry.less';
+@import 'ng-zorro-antd/tag/style/entry.less';
+@import 'ng-zorro-antd/time-picker/style/entry.less';
+@import 'ng-zorro-antd/tooltip/style/entry.less';
+
+// NG-ZORRO takes theme colours from CSS variables (switchable at runtime). Only plain, un-manipulated colour variables
+// may be var(): antd runs Less colour functions on the others, and those must stay literal.
+@primary-color: @tangerine;
+@info-color: @sky;
+@success-color: @mint;
+@warning-color: @lemon;
+@error-color: @bubblegum;
+@link-color: #3a57d8;
+
+@body-background: var(--tf-canvas);
+@component-background: var(--tf-paper);
+@text-color: var(--tf-ink);
+@text-color-secondary: var(--tf-ink-soft);
+@heading-color: var(--tf-ink);
+@border-color-base: var(--tf-edge);
+@border-color-split: var(--tf-line);
+@disabled-color: var(--tf-ink-soft);
+@btn-primary-color: @ink-dark;
+
+@font-family: @font-body;
+@font-size-base: 16px;
+@line-height-base: 1.5;
+@border-radius-base: 10px;
+@border-radius-sm: 8px;
+@border-width-base: 2px;
+
+@height-base: 42px;
+@height-lg: 50px;
+@height-sm: 34px;
+@outline-width: 3px;
+
+// ---- CSS custom properties for our own components ------------------------
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+  --tf-canvas: #f1f6ff;
+  --tf-paper: #ffffff;
+  --tf-ink: @ink-dark;
+  --tf-ink-soft: #565285;
+  --tf-on-color: @ink-dark;
+  --tf-line: #d3dcf0;            // decorative dividers (carries no information)
+  --tf-edge: @ink-dark;          // control borders and sticker outlines
+  --tf-shadow-color: @ink-dark;
+  --tf-link: @link-color;
+
+  --tf-tangerine: @tangerine;
+  --tf-sky: @sky;
+  --tf-lemon: @lemon;
+  --tf-mint: @mint;
+  --tf-bubblegum: @bubblegum;
+  --tf-tangerine-tint: #ffe6d2;
+  --tf-sky-tint: #e1efff;
+  --tf-lemon-tint: #fff3c0;
+  --tf-mint-tint: #d5f7e6;
+  --tf-bubblegum-tint: #ffe0ed;
+
+  --tf-hero: #fff3c0;            // dashboard greeting panel
+  --tf-skeleton-a: #e6edf9;
+  --tf-skeleton-b: #f6f9ff;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --tf-canvas: #14122e;
+  --tf-paper: #201c4a;
+  --tf-ink: #f1f0ff;
+  --tf-ink-soft: #b9b5e6;
+  --tf-line: #3a3570;
+  --tf-edge: #f1f0ff;
+  --tf-shadow-color: #000000;
+  --tf-link: #9db8ff;
+
+  --tf-tangerine-tint: #53321c;
+  --tf-sky-tint: #25396a;
+  --tf-lemon-tint: #4b4420;
+  --tf-mint-tint: #1f4b3b;
+  --tf-bubblegum-tint: #50263f;
+
+  --tf-hero: #2e2a6a;
+  --tf-skeleton-a: #2a2560;
+  --tf-skeleton-b: #342f70;
+}
+
+:root {
+  --tf-font-display: @font-display;
+  --tf-font-body: @font-body;
+
+  // type scale (rem, 16px root)
+  --tf-text-caption: 0.8125rem;
+  --tf-text-small: 0.9375rem;
+  --tf-text-body: 1rem;
+  --tf-text-h3: 1.25rem;
+  --tf-text-h2: 1.6875rem;
+  --tf-text-h1: 2.125rem;
+  --tf-text-display: 3rem;
+
+  // spacing: 4px base
+  --tf-space-1: 0.25rem;
+  --tf-space-2: 0.5rem;
+  --tf-space-3: 0.75rem;
+  --tf-space-4: 1rem;
+  --tf-space-6: 1.5rem;
+  --tf-space-8: 2rem;
+  --tf-space-12: 3rem;
+
+  // radii by role: tiles, panels, controls, pills
+  --tf-radius-sticker: 14px;
+  --tf-radius-panel: 22px;
+  --tf-radius-control: 10px;
+  --tf-radius-pill: 999px;
+
+  // hard offset shadows: they are the "sticker" look, so they never blur
+  --tf-shadow-sticker: 3px 3px 0 var(--tf-shadow-color);
+  --tf-shadow-small: 2px 2px 0 var(--tf-shadow-color);
+  --tf-shadow-panel: 5px 5px 0 var(--tf-shadow-color);
+
+  // motion
+  --tf-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --tf-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --tf-sidebar-width: 244px;
+  --tf-header-height: 64px;
+  --tf-tabbar-height: 68px;
+}
