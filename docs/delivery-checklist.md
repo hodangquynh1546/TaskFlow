@@ -10,6 +10,30 @@ Kiểm tra ngày 2026-11-12.
 - [x] `npm run build`: thành công (cảnh báo ngân sách bundle khởi tạo 1,11 MB, ngưỡng lỗi 1,5 MB)
 - [x] Kiểm tra trình duyệt thật với Backend thật cho các luồng chính và Lịch ngày
 
+## Báo cáo và đa ngôn ngữ (ja, zh)
+- [x] `GET /api/dashboard/report` (tuần/tháng/năm, múi giờ của người dùng) và 11 test tích hợp
+- [x] Báo cáo ở Tổng quan: hai biểu đồ cột, trung bình ngày/tuần/tháng, bảng số liệu cho trình đọc màn hình
+- [x] Tiếng Nhật và tiếng Trung giản thể: giao diện, thông báo lỗi Backend, lịch NG-ZORRO, phông CJK dự phòng; test bắt buộc đủ khóa và không còn chữ Việt/Anh
+- [ ] Bản dịch ja/zh do Claude viết, chưa có người bản ngữ rà soát
+- [ ] Chưa xem bằng trình duyệt thật: bố cục báo cáo trên điện thoại, chế độ tối, chữ CJK trong ô chọn ngày
+
+## Ứng dụng Mac độc lập (Electron)
+- [x] Backend: lệnh `migrate`, chế độ phục vụ Angular (`Hosting:ServeSpa`), 15 test
+- [x] `desktop/`: 42 test đơn vị (vòng đời, sao lưu/khôi phục, dọn tiến trình cũ)
+- [x] Chạy thật gói đã build: PostgreSQL nhúng khởi động, đăng ký/đăng nhập/tạo việc, tìm chữ Việt không phân biệt hoa thường trên `en_US.UTF-8`
+- [x] Thoát bình thường dưới 1 giây, không còn tiến trình; dữ liệu còn sau khi mở lại
+- [x] Bị buộc dừng (`kill -9`): lần mở sau dọn PostgreSQL và API cũ
+- [ ] Chưa thử bằng tay: menu Sao lưu/Khôi phục trong cửa sổ thật, cửa sổ ở chế độ tối/English
+- [ ] Chưa ký Developer ID/notarize (chỉ dùng trên máy build)
+
+## Cài trên Mac (PWA + TaskFlow.app, phương án Docker cũ)
+- [x] `scripts/taskflow`: install, start, stop, status, backup, restore, update, reset, uninstall; thử đủ vòng đời trong project riêng rồi dọn
+- [x] Chrome: manifest đọc được, 0 lỗi installability (CDP `Page.getInstallabilityErrors`)
+- [x] Mở bằng `TaskFlow.app` thật: tự bật stack, DB mới sạch; `Dừng TaskFlow.app` dừng và giữ dữ liệu
+- [x] `TaskFlow.app` mở cửa sổ ứng dụng riêng (Chrome app mode), không phải tab web
+- [ ] Tùy chọn: bạn cài PWA từ Chrome nếu muốn icon TaskFlow riêng trong Dock (tôi không thao tác được giao diện Chrome của bạn)
+- [ ] Thử sao lưu định kỳ: `scripts/taskflow backup` chưa được lên lịch tự động
+
 ## Giao diện v2
 - [x] Việt/English, sáng/tối, chuyển động; kiểm bằng ảnh chụp trên Chromium thật (desktop sáng, tối + English, điện thoại), console không lỗi
 - [x] Thông báo lỗi Backend theo `Accept-Language` (ADR-18), có test bắt buộc mọi thông báo mới phải có bản dịch

@@ -2,7 +2,7 @@
 
 Base path `/api`. JSON (`application/json`), enum dạng chuỗi (số bị từ chối), thời gian ISO 8601 UTC. Server trả dạng `2026-11-12T09:30:00+00:00`; khi nhận, chấp nhận mọi offset hợp lệ (`Z`, `+07:00`...) và chuẩn hóa về UTC. Swagger UI ở `/swagger` (chỉ Development). `GET /health` công khai, trả `{"status":"ok"}`.
 
-Ngôn ngữ: gửi `Accept-Language: en` hoặc `vi`; `title`, `detail` và lỗi từng trường của ProblemDetails được dịch theo (mặc định `vi`). Phản hồi lỗi có `Content-Language` và `Vary: Accept-Language`.
+Ngôn ngữ: gửi `Accept-Language: vi`, `en`, `ja` hoặc `zh`; `title`, `detail` và lỗi từng trường của ProblemDetails được dịch theo (mặc định `vi`). Phản hồi lỗi có `Content-Language` và `Vary: Accept-Language`.
 
 Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cần đăng nhập.
 
@@ -26,6 +26,7 @@ Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cầ
 | GET | /api/dashboard/summary | có | 200 `DashboardSummaryDto` | Số liệu tổng quan |
 | GET | /api/dashboard/upcoming-tasks | có | 200 `TaskDto[]` | Sắp đến hạn |
 | GET | /api/dashboard/recent-tasks | có | 200 `TaskDto[]` | Mới cập nhật |
+| GET | /api/dashboard/report | có | 200 `ReportDto`, 400 | Báo cáo thời gian làm việc theo tuần/tháng/năm |
 
 `GET /api/auth/me` và `GET /api/users/profile` trả cùng dữ liệu; `me` dùng khi khởi động phiên, `profile` cho màn hình hồ sơ. Nếu tài khoản đã bị xóa nhưng token còn hạn thì cả hai trả 401.
 
@@ -96,6 +97,11 @@ Thứ tự ổn định: mọi kiểu sắp xếp đều có khóa phụ `Id`, n
 |---|---|---|---|
 | upcoming-tasks | `limit`, `days` | 5, 7 | limit 1..20, days 1..90. Cửa sổ `now ≤ dueDate ≤ now + days`, đóng ở cả hai đầu, chỉ task chưa Completed; sắp xếp hạn tăng dần |
 | recent-tasks | `limit` | 5 | 1..20. Sắp xếp `updatedAt` giảm dần, gồm cả task Completed |
+| report | `period` | `week` | `week` \| `month` \| `year` |
+| report | `date` | hôm nay (theo múi giờ của người gọi) | `yyyy-MM-dd`, một ngày bất kỳ trong kỳ cần xem |
+| report | `utcOffsetMinutes` | 0 | -840..840. Frontend gửi `-getTimezoneOffset()` để ngày được tính theo đồng hồ của người dùng |
+
+`report` trả `{ period, from, to, buckets[], totals }`. Kỳ là tuần (từ thứ Hai), tháng hoặc năm dương lịch; `buckets` là từng ngày (tuần, tháng) hoặc từng tháng (năm) với `{ start, completedTasks, minutes }`. **Giờ làm việc** = tổng `durationMinutes` của các task **Completed**, tính vào ngày `startDate`; task không có `startDate` không được tính, task không có thời lượng được đếm nhưng cộng 0 phút. `totals` có `completedTasks`, `minutes`, `elapsedDays` (số ngày của kỳ đã trôi qua), `averagePerDayMinutes` (= minutes / elapsedDays), `averagePerWeekMinutes` (= trung bình ngày x 7; null ở báo cáo tuần) và `averagePerMonthMinutes` (= trung bình ngày x 365,25/12; chỉ có ở báo cáo năm). Kỳ chưa bắt đầu có `elapsedDays` = 0 và mọi trung bình bằng 0.
 
 ## Lỗi (RFC 7807)
 

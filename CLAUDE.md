@@ -75,6 +75,7 @@ docker-compose.yml   PostgreSQL local
 ```bash
 cp .env.example .env                       # lần đầu: đổi mật khẩu, sinh Jwt__Key (openssl rand -base64 48); .env bị gitignore
 docker compose up -d --wait                # PostgreSQL 16 trên 127.0.0.1:5432
+scripts/taskflow install                   # cài bản dùng riêng trên Mac (TaskFlow.app); lệnh start/stop/backup/update: scripts/taskflow help
 docker compose --profile app up -d --build --wait   # tùy chọn: cả api + web (nginx) tại :8080; migrate: --profile tools run --rm migrate
 
 cd backend
@@ -118,6 +119,8 @@ Gotchas đã gặp:
 - Frontend (v2): màu chỉ dùng token `--tf-*` (có bộ sáng và tối); chữ trên nền màu dùng `--tf-on-color`. NG-ZORRO đọc `var(--tf-*)` nên đừng đưa biến đã qua hàm Less vào `theme.less` (build lỗi `shade`/`darken`).
 - Frontend (v2): test chạy với trình duyệt giả tiếng Việt và "giảm chuyển động" (`src/test-setup.ts`): số hiện giá trị cuối ngay, không có confetti. Test hoạt họa phải tự thay `matchMedia`.
 - Frontend (v2): chuyển động chỉ CSS + View Transitions + rAF; `prefers-reduced-motion` phải tắt hết. Không thêm thư viện chuyển động.
+- macOS: ứng dụng mở từ Finder không đọc được `~/Documents` (TCC, báo "Operation not permitted"), nên `scripts/taskflow install` chạy từ bản sao ở `~/Library/Application Support/TaskFlow/app`; sửa mã xong phải `scripts/taskflow update`. Gói `.app` tự tạo bằng script không bị quarantine nên mở được ngay.
+- Ứng dụng Mac độc lập (`desktop/`, ADR-19): terminal của VS Code đặt `ELECTRON_RUN_AS_NODE=1` nên chạy Electron từ đó thoát ngay, không báo lỗi (chỉ log `task_name_for_pid`); dùng `env -u ELECTRON_RUN_AS_NODE`. `open` từ terminal đó cũng truyền biến này. bash trên macOS là 3.2 (không có `declare -A`); trong zsh đừng đặt biến vòng lặp tên `path` (nó gắn với `PATH`). Không có `playwright` trong `desktop/`; kiểm thử bằng cách chạy app với `TASKFLOW_USER_DATA`/`TASKFLOW_HIDDEN=1` rồi gọi API qua cổng loopback (`lsof -p <pid API>`).
 - Node: dùng `node@22` của Homebrew (đã `brew link --force node@22`, v22.23.5). Formula `node` 25 còn trong Cellar nhưng đã unlink và đang hỏng (thiếu libsimdjson sau khi Homebrew nâng simdjson); có thể `brew uninstall node` để dọn.
 - EF/Npgsql: chỉ `ToLower()` (không phải `ToLowerInvariant()`) và `Contains(string)` được dịch sang SQL; analyzer CA1304/CA1311/CA1862 bị tắt cục bộ đúng một chỗ trong `TaskService.ApplyFilters` vì lý do này. Truy vấn LINQ chỉ lộ lỗi dịch khi chạy với provider thật, nên logic truy vấn phải được test trên Postgres thật.
 - Npgsql từ chối `DateTimeOffset` có offset khác 0 làm tham số `timestamptz`: mọi giá trị thời gian từ client phải `ToUniversalTime()` trước khi vào truy vấn (Domain đã làm cho đường ghi; `ApplyFilters` làm cho đường lọc).

@@ -77,7 +77,7 @@ Tác nhân duy nhất: **User** (đã đăng nhập, trừ UC-01 và UC-02). M�
 | 04 | GET /api/auth/me | App init |
 | 05 | POST /api/auth/change-password | Profile |
 | 06, 07 | GET, PUT /api/users/profile | Profile |
-| 08 | GET /api/dashboard/{summary,upcoming-tasks,recent-tasks} | Dashboard |
+| 08 | GET /api/dashboard/{summary,upcoming-tasks,recent-tasks,report} | Dashboard |
 | 09 | POST /api/tasks | Create Task |
 | 10, 11 | GET /api/tasks | Task List |
 | 12 | GET /api/tasks/{id} | Task Detail |

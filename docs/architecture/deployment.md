@@ -38,6 +38,22 @@ Mở http://localhost:8080 (đổi cổng bằng `WEB_PORT`). Chỉ container `w
 
 Cấu hình mẫu là điểm khởi đầu, chưa có TLS: đặt thêm một bộ cân bằng tải hoặc chứng chỉ HTTPS phía trước khi mở ra Internet. Nếu có proxy khác phía trước nginx, xem phần HTTPS bên dưới để nginx lấy lại IP người dùng.
 
+## Ứng dụng Mac độc lập (Electron)
+Xem [README](../../README.md#ứng-dụng-mac-độc-lập-không-cần-docker-hay-trình-duyệt) và ADR-19.
+- Build: `desktop/scripts/build.sh` (build Angular, `dotnet publish -r osx-arm64 --self-contained`, lấy PostgreSQL ghim phiên bản, electron-builder, ký ad hoc); `--install` chép vào `~/Applications` và gỡ launcher Docker.
+- Dữ liệu: `~/Library/Application Support/TaskFlow Desktop/` (`pgdata/`, `logs/`, `backups/`, `secrets.bin`). Nhật ký: `logs/api.log`, `logs/postgres.log`.
+- Biến `ELECTRON_RUN_AS_NODE` (VS Code đặt trong terminal của nó) làm ứng dụng thoát ngay không báo lỗi khi chạy từ terminal; chạy kiểm thử bằng `env -u ELECTRON_RUN_AS_NODE`. Mở từ Finder không bị ảnh hưởng.
+- Biến kiểm thử: `TASKFLOW_USER_DATA` (thư mục dữ liệu khác), `TASKFLOW_HIDDEN=1` (không hiện cửa sổ).
+
+## Cài như ứng dụng trên Mac bằng Docker (phương án cũ)
+Xem [README](../../README.md#cài-như-ứng-dụng-trên-mac). Thiết kế:
+- Dùng lại Docker Compose (profile `app`/`tools`) với project riêng `taskflow-app`, cổng 8765 (web) và 5433 (PostgreSQL), volume riêng nên không đụng dữ liệu phát triển.
+- Bí mật (mật khẩu DB, khóa JWT) sinh ngẫu nhiên lần đầu bằng `openssl`, lưu ở `~/Library/Application Support/TaskFlow/.env` (quyền 600).
+- `TaskFlow.app` và `Dừng TaskFlow.app` là hai gói `.app` nhỏ gọi `scripts/taskflow`; chạy từ bản sao mã nguồn ngoài `~/Documents` (TCC của macOS).
+- Cửa sổ: `taskflow open` mở ứng dụng Chrome đã cài nếu có, nếu không thì chạy Chrome với `--app=URL` (cửa sổ không tab, không thanh địa chỉ); không bao giờ mở một tab thường.
+- PWA: `manifest.webmanifest` (kiểu `application/manifest+json` do nginx khai báo) cùng icon 192/512/maskable; Chrome báo không có lỗi installability. Không dùng service worker.
+- Không tự chạy khi đăng nhập (quyết định của chủ dự án): chỉ bật khi bấm `TaskFlow.app`.
+
 ## Bật HTTPS khi mở ra Internet
 Cấu hình mẫu chỉ phục vụ HTTP trên `127.0.0.1`. Trước khi mở ra Internet, đặt một lớp TLS phía trước `web`. Điều kiện: một tên miền trỏ về máy chủ (A/AAAA record) và mở cổng 80, 443. Phần mềm dưới đây đều miễn phí; chi phí chỉ là tên miền và máy chủ.
 

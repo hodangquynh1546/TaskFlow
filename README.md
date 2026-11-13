@@ -45,6 +45,45 @@ docker compose --profile tools run --rm migrate
 ```
 Mở http://localhost:8080. Chi tiết và cảnh báo (chưa có TLS): [deployment.md](docs/architecture/deployment.md).
 
+## Ứng dụng Mac độc lập (không cần Docker hay trình duyệt)
+
+TaskFlow chạy như một ứng dụng thật trên Mac Apple Silicon: có cửa sổ và icon riêng, tự chạy PostgreSQL và API bên trong, không cần Docker, Chrome hay .NET.
+
+```bash
+cd desktop && npm install      # lần đầu
+scripts/build.sh --install     # dựng và chép vào ~/Applications/TaskFlow.app (gỡ bản launcher Docker nếu có)
+```
+- Mở **TaskFlow** từ Launchpad/Spotlight. Đóng cửa sổ là thoát hẳn, không còn tiến trình nền.
+- Dữ liệu: `~/Library/Application Support/TaskFlow Desktop/` (tách khỏi bản Docker). Menu của ứng dụng có Sao lưu, Khôi phục, mở thư mục dữ liệu và nhật ký. Sao lưu là một file `.tar.gz` của thư mục dữ liệu.
+- Cập nhật sau khi sửa mã: chạy lại `scripts/build.sh --install`; dữ liệu giữ nguyên.
+- Chỉ ký ad hoc nên chạy được trên máy build; đưa cho người khác cần Developer ID. Thiết kế: ADR-19.
+
+## Cài như ứng dụng trên Mac bằng Docker (phương án cũ)
+
+Chạy TaskFlow riêng trên máy bạn, có icon trong Dock, dữ liệu riêng và bí mật tự sinh. Cần Docker Desktop và Google Chrome.
+
+```bash
+scripts/taskflow install      # tạo ~/Applications/TaskFlow.app và "Dừng TaskFlow.app"
+```
+1. Bấm **TaskFlow** (Launchpad, Spotlight hoặc `~/Applications`). Lần đầu mất vài phút để dựng; các lần sau chỉ vài chục giây. Ứng dụng tự mở Docker Desktop nếu chưa chạy, cập nhật cấu trúc dữ liệu rồi mở TaskFlow thành **cửa sổ ứng dụng riêng** (Chrome ở chế độ app: không tab, không thanh địa chỉ).
+2. Tùy chọn, để có **icon TaskFlow riêng trong Dock** (mặc định Dock hiện icon Chrome): mở `http://localhost:8765` trong Chrome thường, bấm biểu tượng cài đặt ở cuối thanh địa chỉ (hoặc menu ⋮ > Truyền, lưu và chia sẻ > Cài đặt trang dưới dạng ứng dụng). Từ lần sau `TaskFlow.app` sẽ mở ứng dụng đã cài đó.
+3. Xong việc, bấm **Dừng TaskFlow**. Dữ liệu vẫn được giữ; hệ thống không tự chạy khi đăng nhập macOS.
+
+Địa chỉ: `http://localhost:8765` (cổng 8765 chỉ mở trên máy bạn). Dữ liệu và cấu hình nằm ngoài repo, trong `~/Library/Application Support/TaskFlow/` (file `.env` riêng tư, thư mục `backups/`, nhật ký `taskflow.log`), tách hẳn khỏi bản phát triển.
+
+Sau khi cài còn có lệnh `~/.local/bin/taskflow` (chạy từ bản đã cài, nên dùng được ở mọi terminal mà không cần quyền đọc `~/Documents`; thêm `export PATH="$HOME/.local/bin:$PATH"` vào `~/.zshrc` để gõ `taskflow ...`). Các lệnh dưới đây dùng được với cả `scripts/taskflow` lẫn `taskflow`.
+
+| Lệnh | Việc |
+|---|---|
+| `scripts/taskflow status` / `start` / `stop` / `logs` | trạng thái, bật, dừng, xem nhật ký |
+| `scripts/taskflow backup` | sao lưu ra `backups/*.sql.gz` (giữ 20 bản mới nhất, chỉ người dùng đọc được) |
+| `scripts/taskflow restore <file> --yes` | khôi phục, **ghi đè** dữ liệu hiện tại |
+| `scripts/taskflow update` | `git pull`, chép bản mới, sao lưu, dựng lại, chạy migration |
+| `scripts/taskflow reset --yes` | xóa toàn bộ dữ liệu đã cài |
+| `scripts/taskflow uninstall` | gỡ hai ứng dụng (giữ dữ liệu) |
+
+Ghi chú: ứng dụng chạy từ một bản sao mã nguồn trong thư mục Application Support vì macOS không cho ứng dụng mở từ Finder đọc `~/Documents`. Vì vậy sau khi sửa mã, chạy `scripts/taskflow update` (hoặc `install`) để bản cài nhận thay đổi. Trang có manifest nên Chrome coi là ứng dụng cài được; không có service worker nên không bao giờ hiện dữ liệu cũ từ bộ nhớ đệm.
+
 ## Chạy test
 ```bash
 cd backend && dotnet test TaskManagement.slnx    # cần Docker đang chạy

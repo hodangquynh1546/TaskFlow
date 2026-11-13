@@ -78,7 +78,10 @@ Các điểm chưa rõ trong đặc tả ban đầu và quyết định đã đ�
 | 35 | Xóa task | Load rồi `Remove` (không `ExecuteDelete`, vì Application không tham chiếu package Relational) |
 | 36 | Đăng ký trùng đồng thời | Chặn bởi unique index; service bắt `DbUpdateException` rồi kiểm tra lại email để trả 409 thay vì 500 |
 | 54 | Giao diện v2 | Thiết kế lại cả 8 màn hình theo [design-plan-v2.md](../ui-design/design-plan-v2.md): "Tí và bảng dán", mức chuyển động "rất sống động" nhưng không thêm thư viện chuyển động |
-| 55 | Đa ngôn ngữ | Tiếng Việt và English, đổi tức thì, lưu lựa chọn, mặc định theo trình duyệt. Dịch vụ tự viết (không thêm package): xem ADR-17 |
+| 55 | Đa ngôn ngữ | Tiếng Việt, English, 日本語 và 简体中文 (thêm ja, zh sau; cả giao diện lẫn thông báo lỗi của Backend), đổi tức thì, lưu lựa chọn, mặc định theo trình duyệt. Dịch vụ tự viết (không thêm package): xem ADR-17 |
 | 56 | Sáng/tối | Sáng, Tối, Theo hệ thống (mặc định); lưu lựa chọn; đặt `data-theme` trước khi hiển thị |
 | 57 | Font | Thêm `@fontsource/baloo-2` (tiêu đề); Bricolage Grotesque bị thay |
+| 59 | Cài trên Mac | Phương án "PWA + gói `TaskFlow.app` khởi động" (không Electron/Tauri, không đổi DB): cài từ Chrome, DB mới sạch, chỉ chạy khi bấm `TaskFlow.app`, không tự chạy khi đăng nhập. Thiết kế ở deployment.md |
+| 61 | Báo cáo ở Tổng quan | Báo cáo tuần/tháng/năm: giờ làm việc và số việc hoàn thành, kèm trung bình mỗi ngày/tuần/tháng. Giờ làm việc = thời lượng của việc **đã hoàn thành**, tính vào ngày bắt đầu (không thêm trường `CompletedAt`, không đổi schema). Biểu đồ vẽ bằng CSS, không thêm thư viện. Chi tiết ở api-spec.md |
+| 60 | Ứng dụng Mac độc lập | Thay quyết định 59 trên máy chủ dự án: Electron + API tự chứa + PostgreSQL nhúng, không trình duyệt/Docker, chỉ Apple Silicon của chính họ, không ký Developer ID. Xem ADR-19 |
 | 58 | Thông báo lỗi theo ngôn ngữ | Frontend gửi `Accept-Language` (`vi` hoặc `en`); Backend dịch `title`, `detail` và từng lỗi trường ở lớp API (ADR-18). Mặc định tiếng Việt khi thiếu header hoặc ngôn ngữ không hỗ trợ |

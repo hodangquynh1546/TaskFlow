@@ -73,8 +73,14 @@
 
 ## ADR-18 Dịch thông báo lỗi ở lớp API theo Accept-Language
 - **Bối cảnh:** giao diện có hai ngôn ngữ nhưng Domain/Application viết thông báo bằng tiếng Việt. Dịch ở từng nơi sẽ làm Domain phụ thuộc localization.
-- **Quyết định:** giữ tiếng Việt làm ngôn ngữ nguồn; `ProblemMessages` (API) chọn ngôn ngữ từ `Accept-Language` (theo q, chỉ `vi`/`en`, mặc định `vi`) và dịch `title`, `detail`, lỗi từng trường trong một chỗ (`CustomizeProblemDetails` và `InvalidModelStateResponseFactory`); đặt `Content-Language` và `Vary: Accept-Language`. Thông báo có số dùng mẫu regex.
+- **Quyết định:** giữ tiếng Việt làm ngôn ngữ nguồn; `ProblemMessages` (API) chọn ngôn ngữ từ `Accept-Language` (theo q, `vi`/`en`/`ja`/`zh`, mặc định `vi`; mỗi thông báo có một bản dịch cho từng ngôn ngữ trong cùng một bảng) và dịch `title`, `detail`, lỗi từng trường trong một chỗ (`CustomizeProblemDetails` và `InvalidModelStateResponseFactory`); đặt `Content-Language` và `Vary: Accept-Language`. Thông báo có số dùng mẫu regex.
 - **Hệ quả:** không thêm package; Domain/Application không đổi. Test đọc mã nguồn và **thất bại nếu một thông báo tiếng Việt mới không có bản dịch** (`MessageCompletenessTests`). Thêm ngôn ngữ = thêm một bảng. Thông báo không có bản dịch vẫn trả tiếng Việt, không đoán.
+
+## ADR-19 Ứng dụng Mac độc lập: Electron + API tự chứa + PostgreSQL nhúng
+- **Bối cảnh:** chủ dự án muốn TaskFlow cài trên máy như một ứng dụng thật (như Zalo): không trình duyệt, không Docker. Bản "PWA + launcher Docker" (quyết định 59) vẫn cần cả hai. Chỉ dùng cho máy của chính họ (Apple Silicon).
+- **Quyết định:** thư mục `desktop/`. Electron chỉ là vỏ cửa sổ; khi mở nó chạy PostgreSQL 16 nhúng (bản EnterpriseDB đóng gói bởi zonky, ghim phiên bản, kiểm SHA1, chỉ giữ arm64) trên cổng loopback ngẫu nhiên, chạy `TaskManagement.API migrate`, rồi chạy API .NET đã `publish --self-contained`. API tự phục vụ luôn bản build Angular (`Hosting:ServeSpa`, mặc định tắt nên Docker/nginx không đổi), nên cả ứng dụng là một origin loopback. Giữ PostgreSQL thay vì đổi sang SQLite để không đổi kiến trúc, migration và hành vi tìm kiếm chữ Việt.
+- **Vòng đời:** dữ liệu ở `~/Library/Application Support/TaskFlow Desktop` (tách khỏi dữ liệu Docker). Mật khẩu DB và khóa JWT sinh lần đầu, mã hóa bằng Keychain (`safeStorage`). Đóng cửa sổ là thoát hẳn: dừng API rồi PostgreSQL (SIGINT = fast shutdown). Sau khi bị buộc dừng, lần mở sau dọn PostgreSQL cũ (`postmaster.pid`) và API cũ (`api.pid`, chỉ khi tiến trình đó còn là đúng file API). Sao lưu = dừng cả hai rồi nén thư mục dữ liệu; khôi phục giữ lại `pgdata.before-restore-*`.
+- **Hệ quả:** gói 451 MB; không ký Developer ID/notarize (chỉ ký ad hoc, đủ cho Apple Silicon trên máy build); chia sẻ cho người khác cần Developer ID. Không có `pg_dump`, nên không xuất `.sql`. Locale `en_US.UTF-8` bắt buộc để `lower()` đúng với chữ Việt (đã kiểm trên macOS).
 
 ## ADR-13 Công cụ tạo tài liệu Swagger UI
 - **Bối cảnh:** .NET 10 có `Microsoft.AspNetCore.OpenApi` sinh tài liệu nhưng không kèm giao diện.
