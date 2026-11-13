@@ -102,6 +102,16 @@ describe('ReportComponent', () => {
     expect(tile('Trung bình mỗi tháng')).toBe('58 phút');
   });
 
+  it('a year labels its bars with short month names that fit, not whole phrases', async () => {
+    const { el, report, seg, press } = setup();
+    report.mockReturnValue(of(year));
+
+    await press(seg('Năm'));
+
+    const labels = [...el.querySelector('tf-bar-chart')!.querySelectorAll('.labels span')].map((s) => s.textContent!.trim());
+    expect(labels).toEqual(['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
+  });
+
   it('marks the chosen period for assistive technology', async () => {
     const { seg, press } = setup();
 

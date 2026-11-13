@@ -38,7 +38,8 @@ import { NAV_ITEMS } from './nav-items';
   styles: `
     :host { display: none; }
     @media (max-width: 767.98px) {
-      :host { display: block; position: fixed; inset: auto 0 0 0; z-index: 900; }
+      /* Its own transition layer, so a page change draws it above the sliding page instead of behind it. */
+      :host { display: block; position: fixed; inset: auto 0 0 0; z-index: 900; view-transition-name: tf-tabbar; }
     }
     .bar { background: var(--tf-paper); border-top: 2px solid var(--tf-edge); padding-bottom: env(safe-area-inset-bottom); }
     ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); align-items: end; height: var(--tf-tabbar-height); }

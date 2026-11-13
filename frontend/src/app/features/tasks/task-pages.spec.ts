@@ -53,8 +53,8 @@ const formOf = (fixture: ComponentFixture<unknown>): TaskFormComponent =>
 const submitForm = (el: HTMLElement) => el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
 
 describe('TaskCreateComponent', () => {
-  it('creates the task, thanks the user and opens the new task', async () => {
-    const { mount, tasks, notify, navigate } = setup(TaskCreateComponent);
+  it('creates the task, thanks the user and returns to the list when there is no earlier page', async () => {
+    const { mount, tasks, notify, navigateByUrl } = setup(TaskCreateComponent);
     tasks.create.mockReturnValue(of(aTask({ id: 'new-1' })));
     const fixture = mount();
 
@@ -64,7 +64,21 @@ describe('TaskCreateComponent', () => {
 
     expect(tasks.create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Việc mới', priority: 'High', status: 'Todo', description: null }));
     expect(notify.success).toHaveBeenCalledWith('Đã tạo công việc');
-    expect(navigate).toHaveBeenCalledWith(['/tasks', 'new-1']);
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
+  });
+
+  it('after creating, goes back to the page the user came from, not to the new task', async () => {
+    const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/schedule?date=2026-11-12') } } as never);
+    tasks.create.mockReturnValue(of(aTask({ id: 'new-1' })));
+    const fixture = mount();
+
+    formOf(fixture)['form'].patchValue({ title: 'Việc mới' });
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/schedule?date=2026-11-12', { replaceUrl: true });
   });
 
   it('does not call the server for an invalid form', async () => {
@@ -79,7 +93,7 @@ describe('TaskCreateComponent', () => {
   });
 
   it('shows the server\'s verdict on the form and lets the user fix it and try again', async () => {
-    const { mount, tasks, navigate } = setup(TaskCreateComponent);
+    const { mount, tasks, navigate, navigateByUrl } = setup(TaskCreateComponent);
     tasks.create.mockReturnValue(throwError(() => new ApiError(400, 'x', { startDate: ['Ngày bắt đầu không được sau hạn hoàn thành.'] })));
     const fixture = mount();
 
@@ -97,7 +111,7 @@ describe('TaskCreateComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Ngày bắt đầu không được sau hạn hoàn thành.');
     submitForm(fixture.nativeElement);
     await settle(fixture);
-    expect(navigate).toHaveBeenCalledWith(['/tasks', 'ok']);
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
   });
 
   it('ignores a second submit while the first is running', async () => {
@@ -112,13 +126,13 @@ describe('TaskCreateComponent', () => {
     expect(tasks.create).toHaveBeenCalledTimes(1);
   });
 
-  it('cancel returns to the list without saving', () => {
+  it('cancel returns to where the user came from without saving', () => {
     const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
     const fixture = mount();
 
     [...fixture.nativeElement.querySelectorAll('button')].find((b) => (b as HTMLElement).textContent!.trim() === 'Hủy').click();
 
-    expect(navigateByUrl).toHaveBeenCalledWith('/tasks');
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
     expect(tasks.create).not.toHaveBeenCalled();
   });
 

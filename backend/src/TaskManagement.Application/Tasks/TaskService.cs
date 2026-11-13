@@ -154,20 +154,24 @@ internal sealed class TaskService(
         return tasks;
     }
 
-    /// <summary>Id is always the last key so pages are stable even when many rows share the sort value (SF-05).</summary>
+    /// <summary>
+    /// Finished tasks always sink below the open ones, whatever the sort, so finishing a task moves it out of the way.
+    /// Id is always the last key so pages are stable even when many rows share the sort value (SF-05).
+    /// </summary>
     private static IOrderedQueryable<TaskItem> ApplySort(IQueryable<TaskItem> tasks, TaskQuery query)
     {
         var desc = query.SortDir == SortDirection.Desc;
+        var open = tasks.OrderBy(t => t.Status == TaskItemStatus.Completed);
         var ordered = (query.SortBy, desc) switch
         {
-            (TaskSortField.DueDate, false) => tasks.OrderBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
-            (TaskSortField.DueDate, true) => tasks.OrderBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
-            (TaskSortField.StartDate, false) => tasks.OrderBy(t => t.StartDate == null).ThenBy(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
-            (TaskSortField.StartDate, true) => tasks.OrderBy(t => t.StartDate == null).ThenByDescending(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
-            (TaskSortField.Priority, false) => tasks.OrderBy(t => t.Priority).ThenByDescending(t => t.CreatedAt),
-            (TaskSortField.Priority, true) => tasks.OrderByDescending(t => t.Priority).ThenByDescending(t => t.CreatedAt),
-            (_, false) => tasks.OrderBy(t => t.CreatedAt),
-            _ => tasks.OrderByDescending(t => t.CreatedAt),
+            (TaskSortField.DueDate, false) => open.ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
+            (TaskSortField.DueDate, true) => open.ThenBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
+            (TaskSortField.StartDate, false) => open.ThenBy(t => t.StartDate == null).ThenBy(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
+            (TaskSortField.StartDate, true) => open.ThenBy(t => t.StartDate == null).ThenByDescending(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
+            (TaskSortField.Priority, false) => open.ThenBy(t => t.Priority).ThenByDescending(t => t.CreatedAt),
+            (TaskSortField.Priority, true) => open.ThenByDescending(t => t.Priority).ThenByDescending(t => t.CreatedAt),
+            (_, false) => open.ThenBy(t => t.CreatedAt),
+            _ => open.ThenByDescending(t => t.CreatedAt),
         };
         return ordered.ThenBy(t => t.Id);
     }

@@ -82,6 +82,7 @@ Các điểm chưa rõ trong đặc tả ban đầu và quyết định đã đ�
 | 56 | Sáng/tối | Sáng, Tối, Theo hệ thống (mặc định); lưu lựa chọn; đặt `data-theme` trước khi hiển thị |
 | 57 | Font | Thêm `@fontsource/baloo-2` (tiêu đề); Bricolage Grotesque bị thay |
 | 59 | Cài trên Mac | Phương án "PWA + gói `TaskFlow.app` khởi động" (không Electron/Tauri, không đổi DB): cài từ Chrome, DB mới sạch, chỉ chạy khi bấm `TaskFlow.app`, không tự chạy khi đăng nhập. Thiết kế ở deployment.md |
+| 62 | Giữ đăng nhập lâu | Refresh token xoay vòng 90 ngày kể từ lần dùng cuối, bảng `RefreshTokens` (ADR-20). Danh sách việc: việc Completed luôn xuống cuối mọi kiểu sắp xếp |
 | 61 | Báo cáo ở Tổng quan | Báo cáo tuần/tháng/năm: giờ làm việc và số việc hoàn thành, kèm trung bình mỗi ngày/tuần/tháng. Giờ làm việc = thời lượng của việc **đã hoàn thành**, tính vào ngày bắt đầu (không thêm trường `CompletedAt`, không đổi schema). Biểu đồ vẽ bằng CSS, không thêm thư viện. Chi tiết ở api-spec.md |
 | 60 | Ứng dụng Mac độc lập | Thay quyết định 59 trên máy chủ dự án: Electron + API tự chứa + PostgreSQL nhúng, không trình duyệt/Docker, chỉ Apple Silicon của chính họ, không ký Developer ID. Xem ADR-19 |
 | 58 | Thông báo lỗi theo ngôn ngữ | Frontend gửi `Accept-Language` (`vi` hoặc `en`); Backend dịch `title`, `detail` và từng lỗi trường ở lớp API (ADR-18). Mặc định tiếng Việt khi thiếu header hoặc ngôn ngữ không hỗ trợ |

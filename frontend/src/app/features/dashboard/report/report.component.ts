@@ -16,6 +16,8 @@ import { parseDay } from '../../tasks/task-query';
 import { DashboardService, Report, ReportPeriod } from '../dashboard.service';
 import { niceCeil, periodAnchor } from './report-math';
 
+/** Widest month label that fits under one of twelve bars on a phone. */
+const MAX_MONTH_LABEL = 4;
 const PERIODS: readonly ReportPeriod[] = ['week', 'month', 'year'];
 const PERIOD_KEYS: Readonly<Record<ReportPeriod, MessageKey>> = { week: 'report.period.week', month: 'report.period.month', year: 'report.period.year' };
 
@@ -75,7 +77,7 @@ export class ReportComponent {
       return {
         label: showLabel
           ? byMonth
-            ? this.i18n.formatDate(day, { month: 'short' })
+            ? this.monthLabel(day)
             : report.period === 'week'
               ? this.i18n.formatDate(day, { weekday: 'short' })
               : String(day.getDate())
@@ -171,6 +173,12 @@ export class ReportComponent {
 
   protected retry(): void {
     this.reload$.next();
+  }
+
+  /** "Jan", "1月"; and "T1" where the short name is a whole phrase ("Tháng 1") that would not fit under a bar. */
+  private monthLabel(day: Date): string {
+    const name = this.i18n.formatDate(day, { month: 'short' });
+    return name.length > MAX_MONTH_LABEL ? this.t('report.monthShort', { n: day.getMonth() + 1 }) : name;
   }
 
   protected duration(minutes: number): string {

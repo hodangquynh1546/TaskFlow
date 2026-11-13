@@ -112,6 +112,44 @@ public sealed class TaskQueryTests : IDisposable
         Assert.Equal(["13th-08h-early", "13th-08h-late", "13th-12h", "14th-08h", "unscheduled"], asc);
     }
 
+    [Theory]
+    [InlineData("createdAt", "asc")]
+    [InlineData("createdAt", "desc")]
+    [InlineData("startDate", "asc")]
+    [InlineData("dueDate", "desc")]
+    [InlineData("priority", "desc")]
+    public async Task Finished_tasks_sink_below_open_ones_whatever_the_sort(string sortBy, string sortDir)
+    {
+        var user = await _api.RegisterAsync();
+        // The finished tasks would come first in every one of these orders if status did not matter.
+        await _api.SeedTaskAsync(user.Id, "done-early", TaskItemStatus.Completed, TaskPriority.High, start: Now.AddHours(1), due: Now.AddDays(1), created: Now.AddMinutes(-9));
+        await _api.SeedTaskAsync(user.Id, "done-late", TaskItemStatus.Completed, TaskPriority.High, start: Now.AddHours(2), due: Now.AddDays(2), created: Now.AddMinutes(-1));
+        await _api.SeedTaskAsync(user.Id, "open-a", TaskItemStatus.Todo, TaskPriority.Low, start: Now.AddDays(5), due: Now.AddDays(6), created: Now.AddMinutes(-8));
+        await _api.SeedTaskAsync(user.Id, "open-b", TaskItemStatus.InProgress, TaskPriority.Low, start: Now.AddDays(7), due: Now.AddDays(8), created: Now.AddMinutes(-2));
+
+        var titles = (await Page(user, ("sortBy", sortBy), ("sortDir", sortDir))).Titles();
+
+        Assert.Equal(["open-a", "open-b"], titles.Take(2).Order());
+        Assert.Equal(["done-early", "done-late"], titles.Skip(2).Order());
+    }
+
+    [Fact]
+    public async Task Finished_tasks_come_last_across_pages_too_not_just_within_one_page()
+    {
+        var user = await _api.RegisterAsync();
+        for (var i = 0; i < 3; i++)
+        {
+            await _api.SeedTaskAsync(user.Id, $"done-{i}", TaskItemStatus.Completed, created: Now.AddMinutes(-30 + i));
+            await _api.SeedTaskAsync(user.Id, $"open-{i}", TaskItemStatus.Todo, created: Now.AddMinutes(-60 + i));
+        }
+
+        var first = (await Page(user, ("pageSize", "3"), ("page", "1"), ("sortBy", "createdAt"), ("sortDir", "desc"))).Titles();
+        var second = (await Page(user, ("pageSize", "3"), ("page", "2"), ("sortBy", "createdAt"), ("sortDir", "desc"))).Titles();
+
+        Assert.All(first, t => Assert.StartsWith("open-", t));
+        Assert.All(second, t => Assert.StartsWith("done-", t));
+    }
+
     [Fact]
     public async Task Sort_by_priority_orders_by_importance_then_newest_first()
     {

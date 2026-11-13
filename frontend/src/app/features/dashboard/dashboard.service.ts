@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 import { API_BASE_URL } from '../../core/config/api.config';
 import { DashboardSummary, Task } from '../../shared/models/task.models';
@@ -50,7 +50,8 @@ export class DashboardService {
   /** `date` is any day inside the wanted period; the UTC offset makes the server count days the way the user's clock does. */
   report(period: ReportPeriod, date: string, utcOffsetMinutes: number): Observable<Report> {
     const params = new HttpParams().set('period', period).set('date', date).set('utcOffsetMinutes', utcOffsetMinutes);
-    return this.http.get<Report>(`${this.url}/report`, { params });
+    // The API writes enums PascalCase ("Year"); the rest of the app uses the lower-case period names.
+    return this.http.get<Report>(`${this.url}/report`, { params }).pipe(map((report) => ({ ...report, period: report.period.toLowerCase() as ReportPeriod })));
   }
 
   recent(limit = 5): Observable<Task[]> {

@@ -260,6 +260,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'report.empty': 'No finished tasks in this period. Finish a task that has a start time to see the report.',
   'report.loading': 'Loading the report',
   'report.loadError': 'Could not load the report.',
+  'report.monthShort': 'M{n}',
   'report.hoursShort': '{n} h',
   'report.barLabel': '{label}: {value}',
   'report.tableAria': 'Report data',

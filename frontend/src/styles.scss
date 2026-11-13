@@ -172,6 +172,10 @@ html.tf-theme-fade *::after {
 .tf-chrome { view-transition-name: tf-chrome; }
 
 ::view-transition-group(root) { animation-duration: 0s; }
+// The phone tab bar does not move or fade during a page change; it only has to stay on top of the page that does.
+::view-transition-group(tf-tabbar) { animation-duration: 0s; z-index: 1; }
+::view-transition-old(tf-tabbar) { display: none; }
+::view-transition-new(tf-tabbar) { animation: none; }
 ::view-transition-old(tf-main) { animation: tf-leave 140ms ease-in both; }
 ::view-transition-new(tf-main) { animation: tf-enter 320ms var(--tf-ease-out) both; }
 

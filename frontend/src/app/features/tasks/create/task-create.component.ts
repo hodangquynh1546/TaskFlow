@@ -9,6 +9,7 @@ import { NotifyService } from '../../../core/notify/notify.service';
 import { TaskPayload } from '../../../shared/models/task.models';
 import { TaskFormComponent } from '../form/task-form.component';
 import { TaskService } from '../task.service';
+import { pageBeforeCreate } from './previous-page';
 
 @Component({
   selector: 'tf-task-create',
@@ -26,6 +27,9 @@ export class TaskCreateComponent {
   private readonly notify = inject(NotifyService);
   private readonly i18n = inject(I18nService);
 
+  /** Captured while the router is still navigating here, because afterwards it no longer remembers where we came from. */
+  private readonly returnTo = pageBeforeCreate(this.router.currentNavigation()?.previousNavigation?.finalUrl?.toString());
+
   /** Bound from the query string by the router: set when the user starts from a free slot on the day calendar. */
   readonly date = input<string>();
   readonly time = input<string>();
@@ -42,7 +46,8 @@ export class TaskCreateComponent {
     this.tasks.create(payload).subscribe({
       next: (task) => {
         this.notify.success(this.i18n.t('toast.created'));
-        void this.router.navigate(['/tasks', task.id]);
+        // Replaces the form in the history, so Back does not land on an empty form for a task that already exists.
+        void this.router.navigateByUrl(this.returnTo, { replaceUrl: true });
       },
       error: (error: ApiError) => {
         this.saving.set(false);
@@ -52,6 +57,6 @@ export class TaskCreateComponent {
   }
 
   protected cancel(): void {
-    void this.router.navigateByUrl('/tasks');
+    void this.router.navigateByUrl(this.returnTo, { replaceUrl: true });
   }
 }

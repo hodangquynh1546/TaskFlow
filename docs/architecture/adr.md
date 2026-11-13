@@ -20,7 +20,7 @@
 - **Quyết định:** MVC Controllers; lỗi theo RFC 7807 qua `IExceptionHandler` tập trung; thành công trả dữ liệu trực tiếp, không bọc envelope.
 - **Hệ quả:** khớp chuẩn .NET và Swagger; Frontend dùng một cách xử lý lỗi duy nhất.
 
-## ADR-05 JWT stateless, không refresh token
+## ADR-05 JWT stateless, không refresh token (đã bổ sung bởi ADR-20)
 - **Quyết định:** access token 60 phút; không refresh token, không blacklist, không security stamp (không thêm bảng).
 - **Hệ quả (hạn chế đã biết):** logout chỉ xóa token phía client; đổi mật khẩu không vô hiệu hóa token đang lưu hành; hết hạn thì phải đăng nhập lại. Chấp nhận cho v1. Hướng nâng cấp: refresh token xoay vòng + bảng `RefreshTokens`, cần bạn duyệt vì thêm bảng.
 - Token lưu `localStorage` (ADR-06).
@@ -80,7 +80,14 @@
 - **Bối cảnh:** chủ dự án muốn TaskFlow cài trên máy như một ứng dụng thật (như Zalo): không trình duyệt, không Docker. Bản "PWA + launcher Docker" (quyết định 59) vẫn cần cả hai. Chỉ dùng cho máy của chính họ (Apple Silicon).
 - **Quyết định:** thư mục `desktop/`. Electron chỉ là vỏ cửa sổ; khi mở nó chạy PostgreSQL 16 nhúng (bản EnterpriseDB đóng gói bởi zonky, ghim phiên bản, kiểm SHA1, chỉ giữ arm64) trên cổng loopback ngẫu nhiên, chạy `TaskManagement.API migrate`, rồi chạy API .NET đã `publish --self-contained`. API tự phục vụ luôn bản build Angular (`Hosting:ServeSpa`, mặc định tắt nên Docker/nginx không đổi), nên cả ứng dụng là một origin loopback. Giữ PostgreSQL thay vì đổi sang SQLite để không đổi kiến trúc, migration và hành vi tìm kiếm chữ Việt.
 - **Vòng đời:** dữ liệu ở `~/Library/Application Support/TaskFlow Desktop` (tách khỏi dữ liệu Docker). Mật khẩu DB và khóa JWT sinh lần đầu, mã hóa bằng Keychain (`safeStorage`). Đóng cửa sổ là thoát hẳn: dừng API rồi PostgreSQL (SIGINT = fast shutdown). Sau khi bị buộc dừng, lần mở sau dọn PostgreSQL cũ (`postmaster.pid`) và API cũ (`api.pid`, chỉ khi tiến trình đó còn là đúng file API). Sao lưu = dừng cả hai rồi nén thư mục dữ liệu; khôi phục giữ lại `pgdata.before-restore-*`.
+- **Địa chỉ cố định:** cổng API được nhớ ở `api-port` trong thư mục dữ liệu và dùng lại mỗi lần mở (nếu bị chiếm thì chọn cổng mới). Trình duyệt lưu đăng nhập theo địa chỉ gồm cả cổng, nên cổng ngẫu nhiên mỗi lần sẽ bắt đăng nhập lại ở mọi lần mở. Khi thoát, ứng dụng ép ghi dữ liệu trình duyệt xuống đĩa trước `app.exit()`.
 - **Hệ quả:** gói 451 MB; không ký Developer ID/notarize (chỉ ký ad hoc, đủ cho Apple Silicon trên máy build); chia sẻ cho người khác cần Developer ID. Không có `pg_dump`, nên không xuất `.sql`. Locale `en_US.UTF-8` bắt buộc để `lower()` đúng với chữ Việt (đã kiểm trên macOS).
+
+## ADR-20 Giữ đăng nhập lâu bằng refresh token xoay vòng
+- **Bối cảnh:** access token chỉ sống 60 phút (ADR-05) nên người dùng phải đăng nhập lại mỗi ngày; chủ dự án muốn ở lại đăng nhập lâu như Facebook. Chỉ kéo dài tuổi thọ JWT thì không thu hồi được khi lộ token. Đây là hướng nâng cấp mà ADR-05 đã nêu; được chủ dự án yêu cầu.
+- **Quyết định:** access token vẫn 60 phút. Thêm bảng `RefreshTokens` (chỉ lưu hash SHA-256; `FamilyId` = một lần đăng nhập trên một thiết bị). Đăng nhập/đăng ký trả thêm `refreshToken`; `POST /api/auth/refresh` đổi nó lấy cặp mới và token cũ bị đánh dấu đã xoay. Sống 90 ngày kể từ lần dùng cuối (`Jwt:RefreshDays`), nên dùng đều thì không bao giờ phải đăng nhập lại. Token đã xoay mà bị dùng lại sau 30 giây = bị đánh cắp: cả họ token bị thu hồi. Trong 30 giây thì chấp nhận (hai tab cùng làm mới). `logout` thu hồi họ token của thiết bị đó; đổi mật khẩu thu hồi mọi thiết bị khác (gửi kèm refresh token của thiết bị này để giữ nó).
+- **Frontend:** refresh token nằm cùng phiên trong `localStorage`. Interceptor làm mới trước khi gửi nếu access token đã hết hạn, và làm mới rồi gửi lại đúng một lần khi gặp 401; các yêu cầu cùng lúc dùng chung một lần làm mới. Chỉ khi server từ chối refresh token mới đăng xuất; mất mạng thì giữ phiên.
+- **Hệ quả:** thêm một bảng và migration `AddRefreshTokens`. Refresh token ở `localStorage` vẫn bị XSS đọc được, như access token (ADR-06); CSP chặt là lớp phòng thủ chính. Access token đã cấp vẫn dùng được đến khi hết hạn sau khi logout (tối đa 60 phút).
 
 ## ADR-13 Công cụ tạo tài liệu Swagger UI
 - **Bối cảnh:** .NET 10 có `Microsoft.AspNetCore.OpenApi` sinh tài liệu nhưng không kèm giao diện.

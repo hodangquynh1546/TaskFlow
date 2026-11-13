@@ -14,6 +14,7 @@
 | `Jwt__Key` | có | Khóa ký, ≥ 32 byte (`openssl rand -base64 48`). Thiếu hoặc ngắn thì API không khởi động |
 | `Jwt__Issuer`, `Jwt__Audience` | không | Mặc định `TaskFlow`, `TaskFlow.Client` |
 | `Jwt__ExpiresMinutes` | không | Mặc định 60 |
+| `Jwt__RefreshDays` | không | Mặc định 90: số ngày không dùng thì thiết bị bị đăng xuất (ADR-20) |
 | `RateLimiting__AuthPermitPerMinute` | không | Số lần login/register mỗi phút mỗi IP, mặc định 10 |
 | `ForwardedHeaders__Enabled` | không | `true` khi đặt sau reverse proxy. Khi bật **bắt buộc** có `ForwardedHeaders__KnownProxies__0` (IP) hoặc `ForwardedHeaders__KnownNetworks__0` (CIDR), nếu không API không khởi động. Mặc định tắt: header `X-Forwarded-For` bị bỏ qua để client không tự chọn IP |
 | `Cors__AllowedOrigins__0` | không | Chỉ cần khi Frontend khác origin (danh sách rỗng mặc định) |

@@ -12,9 +12,10 @@ Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cầ
 |---|---|---|---|---|
 | POST | /api/auth/register | không | 201 `AuthResponse` | Đăng ký, đăng nhập luôn |
 | POST | /api/auth/login | không | 200 `AuthResponse` | Đăng nhập |
-| POST | /api/auth/logout | có | 204 | Đăng xuất (stateless, xem ADR-05) |
+| POST | /api/auth/refresh | không | 200 `AuthResponse`, 401 | Đổi refresh token lấy access token mới và refresh token mới (xoay vòng, ADR-20) |
+| POST | /api/auth/logout | không | 204 | Thu hồi phiên của thiết bị theo `{ refreshToken }`; luôn 204 |
 | GET | /api/auth/me | có | 200 `UserDto` | Tài khoản hiện tại |
-| POST | /api/auth/change-password | có | 204 | Đổi mật khẩu |
+| POST | /api/auth/change-password | có | 204 | Đổi mật khẩu; `refreshToken` (tùy chọn) của thiết bị này được giữ, mọi thiết bị khác bị đăng xuất |
 | GET | /api/users/profile | có | 200 `UserDto` | Xem hồ sơ |
 | PUT | /api/users/profile | có | 200 `UserDto` | Cập nhật hồ sơ |
 | GET | /api/tasks | có | 200 `PagedResult<TaskDto>` | Danh sách, lọc, sắp xếp, phân trang |
@@ -30,13 +31,13 @@ Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cầ
 
 `GET /api/auth/me` và `GET /api/users/profile` trả cùng dữ liệu; `me` dùng khi khởi động phiên, `profile` cho màn hình hồ sơ. Nếu tài khoản đã bị xóa nhưng token còn hạn thì cả hai trả 401.
 
-Đăng ký trả 201 kèm `AuthResponse` (tự đăng nhập). Đăng nhập sai luôn trả cùng một thông báo ("Email hoặc mật khẩu không đúng.") dù sai email hay sai mật khẩu, và thời gian xử lý tương đương.
+Đăng ký trả 201 kèm `AuthResponse` (`accessToken`, `expiresAt`, `refreshToken`, `user`; tự đăng nhập). Đăng nhập sai luôn trả cùng một thông báo ("Email hoặc mật khẩu không đúng.") dù sai email hay sai mật khẩu, và thời gian xử lý tương đương.
 
 ## DTO
 
 ```jsonc
 // AuthResponse
-{ "accessToken": "eyJ...", "expiresAt": "2026-11-12T10:30:00Z", "user": UserDto }
+{ "accessToken": "eyJ...", "expiresAt": "2026-11-12T10:30:00Z", "refreshToken": "base64url...", "user": UserDto }
 
 // UserDto  (không bao giờ có passwordHash)
 { "id": "uuid", "fullName": "Nguyễn Văn A", "email": "a@example.com", "createdAt": "...", "updatedAt": "..." }

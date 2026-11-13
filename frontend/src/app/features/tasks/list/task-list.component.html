@@ -114,7 +114,8 @@
                 }
               </div>
 
-              <button type="button" class="row__menu" nz-button nzType="text" nz-dropdown nzTrigger="click" nzPlacement="bottomRight"
+              <button type="button" class="row__menu" nz-button nzType="text" nz-dropdown nzTrigger="click" [nzPlacement]="menuPlacement()"
+                      (pointerdown)="placeMenu($event)" (focus)="placeMenu($event)"
                       [nzDropdownMenu]="menu" [attr.aria-label]="'tasks.rowActions' | t: { title: task.title }">
                 <span nz-icon nzType="ellipsis" nzTheme="outline" aria-hidden="true"></span>
               </button>

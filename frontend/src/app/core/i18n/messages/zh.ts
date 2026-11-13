@@ -252,6 +252,7 @@ export const zh: Readonly<Record<MessageKey, string>> = {
   'report.empty': '这个周期内还没有已完成的任务。完成一个设有开始时间的任务后即可看到报告。',
   'report.loading': '正在加载报告',
   'report.loadError': '无法加载报告。',
+  'report.monthShort': '{n}月',
   'report.hoursShort': '{n} 小时',
   'report.barLabel': '{label}：{value}',
   'report.tableAria': '报告数据',

@@ -270,6 +270,7 @@ export const vi = {
   'report.empty': 'Chưa có việc nào hoàn thành trong kỳ này. Hoàn thành một việc có giờ bắt đầu để thấy báo cáo.',
   'report.loading': 'Đang tải báo cáo',
   'report.loadError': 'Không tải được báo cáo.',
+  'report.monthShort': 'T{n}',
   'report.hoursShort': '{n} giờ',
   'report.barLabel': '{label}: {value}',
   'report.tableAria': 'Số liệu báo cáo',

@@ -405,6 +405,39 @@ describe('TaskListComponent', () => {
     });
   });
 
+  describe('row menu placement', () => {
+    const buttonAt = (bottom: number) => {
+      const button = document.createElement('button');
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ bottom } as DOMRect);
+      return { currentTarget: button } as unknown as Event;
+    };
+
+    it('opens downward when there is room, and upward when it would run under the tab bar', async () => {
+      const { component } = await setup();
+      const bar = document.createElement('tf-tab-bar');
+      vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue({ top: 770, height: 72 } as DOMRect);
+      document.body.append(bar);
+
+      component['placeMenu'](buttonAt(300));
+      expect(component['menuPlacement']()).toBe('bottomRight');
+
+      component['placeMenu'](buttonAt(700));
+      expect(component['menuPlacement']()).toBe('topRight');
+
+      bar.remove();
+    });
+
+    it('with no tab bar (desktop) only the window edge matters', async () => {
+      const { component } = await setup();
+
+      component['placeMenu'](buttonAt(window.innerHeight - 20));
+      expect(component['menuPlacement']()).toBe('topRight');
+
+      component['placeMenu'](buttonAt(100));
+      expect(component['menuPlacement']()).toBe('bottomRight');
+    });
+  });
+
   describe('deleting', () => {
     it('asks for confirmation naming the task, then deletes, tells the user and refreshes', async () => {
       const { component, service, confirm, notify, settle } = await setup();

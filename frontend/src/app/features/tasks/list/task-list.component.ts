@@ -50,6 +50,9 @@ import {
 } from '../task-query';
 import { TaskService } from '../task.service';
 
+/** Room an open row menu needs below its button: two items, a divider and the shadow. */
+const MENU_HEIGHT = 130;
+
 type LoadState = 'loading' | 'ready' | 'error';
 
 const SORT_KEYS: Readonly<Record<TaskSortField, MessageKey>> = {
@@ -104,6 +107,9 @@ export class TaskListComponent {
   protected readonly error = signal<ApiError | null>(null);
   protected readonly filtersOpen = signal(false);
   protected readonly busy = signal<ReadonlySet<string>>(new Set());
+
+  /** Opens upward when a downward menu would run under the bottom tab bar (phones), which it would otherwise cover. */
+  protected readonly menuPlacement = signal<'bottomRight' | 'topRight'>('bottomRight');
 
   protected readonly searchControl = new FormControl('', { nonNullable: true });
 
@@ -203,6 +209,16 @@ export class TaskListComponent {
 
   protected createTask(): void {
     void this.router.navigateByUrl('/tasks/new');
+  }
+
+  protected placeMenu(event: Event): void {
+    const button = event.currentTarget;
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+    const bar = document.querySelector('tf-tab-bar');
+    const floor = bar && bar.getBoundingClientRect().height > 0 ? bar.getBoundingClientRect().top : window.innerHeight;
+    this.menuPlacement.set(button.getBoundingClientRect().bottom + MENU_HEIGHT > floor ? 'topRight' : 'bottomRight');
   }
 
   protected isBusy(id: string): boolean {

@@ -17,6 +17,17 @@ Kiểm tra ngày 2026-11-12.
 - [ ] Bản dịch ja/zh do Claude viết, chưa có người bản ngữ rà soát
 - [ ] Chưa xem bằng trình duyệt thật: bố cục báo cáo trên điện thoại, chế độ tối, chữ CJK trong ô chọn ngày
 
+## Ở lại đăng nhập, danh sách việc, sửa lỗi giao diện
+- [x] Refresh token xoay vòng (ADR-20): 17 test tích hợp (xoay, hết hạn, phát hiện dùng lại, đăng xuất, đổi mật khẩu, xóa tài khoản) và test interceptor; đã thử trên bản thật với access token hết hạn: tải lại vẫn ở đúng trang
+- [x] Ứng dụng Mac vẫn còn đăng nhập sau khi thoát (Cmd+Q) và mở lại: lỗi do cổng API ngẫu nhiên mỗi lần chạy (đăng nhập lưu theo địa chỉ); đã cố định cổng và kiểm bằng cách mở, thoát, mở lại hai lần
+- [x] Điện thoại: thanh tab dưới không còn bị trang đang chuyển che khuất khi đổi mục (lỗi View Transitions)
+- [x] Tạo hoặc hủy việc xong thì quay về trang trước đó (tổng quan, lịch ngày đúng ngày đang xem, danh sách đã lọc), không vào chi tiết việc; mở thẳng form thì về danh sách
+- [x] Việc hoàn thành luôn xuống cuối danh sách, kể cả khi phân trang
+- [x] Biểu đồ năm: backend trả `"Year"` nhưng giao diện so với `'year'` nên nhãn tháng bị sai; đã sửa và nhãn dài ("Tháng 11") rút thành "T11"
+- [x] Menu thao tác ở hàng việc mở lên trên khi gần thanh tab dưới (điện thoại)
+- [ ] Chưa kiểm menu của các ô chọn khác (lọc, chọn ngày) khi sát thanh tab dưới
+- [ ] Mỗi lần dựng lại ứng dụng Mac, macOS hỏi lại quyền Keychain ("TaskFlow Safe Storage"): chọn Luôn cho phép
+
 ## Ứng dụng Mac độc lập (Electron)
 - [x] Backend: lệnh `migrate`, chế độ phục vụ Angular (`Hosting:ServeSpa`), 15 test
 - [x] `desktop/`: 42 test đơn vị (vòng đời, sao lưu/khôi phục, dọn tiến trình cũ)

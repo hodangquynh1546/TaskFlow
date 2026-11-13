@@ -252,6 +252,7 @@ export const ja: Readonly<Record<MessageKey, string>> = {
   'report.empty': 'この期間に完了したタスクはありません。開始時刻のあるタスクを完了すると、レポートが表示されます。',
   'report.loading': 'レポートを読み込み中',
   'report.loadError': 'レポートを読み込めませんでした。',
+  'report.monthShort': '{n}月',
   'report.hoursShort': '{n}時間',
   'report.barLabel': '{label}: {value}',
   'report.tableAria': 'レポートの数値',
