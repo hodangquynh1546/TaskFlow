@@ -11,7 +11,7 @@ const NOW = new Date('2026-11-12T10:00:00Z');
 const USER: User = { id: 'u1', fullName: 'Nguyễn Văn A', email: 'a@example.com', createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() };
 const FUTURE = '2026-11-12T11:00:00Z';
 const PAST = '2026-11-12T09:59:59Z';
-const response = (expiresAt = FUTURE): AuthResponse => ({ accessToken: 'tok-1', expiresAt, user: USER });
+const response = (expiresAt = FUTURE): AuthResponse => ({ accessToken: 'tok-1', expiresAt, refreshToken: 'ref-1', user: USER });
 
 function setup(stored?: StoredSession) {
   localStorage.clear();
@@ -50,7 +50,7 @@ describe('AuthService', () => {
       expect(auth.hasValidSession()).toBe(true);
       expect(auth.accessToken()).toBe('tok-1');
       expect(auth.isSignedIn()).toBe(true);
-      expect(JSON.parse(localStorage.getItem('taskflow.session')!)).toEqual({ accessToken: 'tok-1', expiresAt: FUTURE });
+      expect(JSON.parse(localStorage.getItem('taskflow.session')!)).toEqual({ accessToken: 'tok-1', expiresAt: FUTURE, refreshToken: 'ref-1' });
     });
 
     it('a failed login leaves the user signed out and stores nothing', () => {
@@ -155,6 +155,105 @@ describe('AuthService', () => {
     });
   });
 
+  describe('staying signed in', () => {
+    const expired = { accessToken: 'old', expiresAt: PAST, refreshToken: 'ref-old' };
+    const rotated = { accessToken: 'tok-2', expiresAt: FUTURE, refreshToken: 'ref-2', user: USER };
+
+    it('reopening the app with an expired access token renews it instead of signing out', async () => {
+      const { auth, http } = setup(expired);
+
+      const pending = auth.restoreSession();
+      const refresh = http.expectOne('/api/auth/refresh');
+      expect(refresh.request.body).toEqual({ refreshToken: 'ref-old' });
+      refresh.flush(rotated);
+      await vi.waitFor(() => http.expectOne('/api/auth/me').flush(USER));
+      await pending;
+
+      expect(auth.hasValidSession()).toBe(true);
+      expect(auth.accessToken()).toBe('tok-2');
+      expect(auth.user()).toEqual(USER);
+      expect(JSON.parse(localStorage.getItem('taskflow.session')!)).toEqual({ accessToken: 'tok-2', expiresAt: FUTURE, refreshToken: 'ref-2' });
+    });
+
+    it('an access token refused at startup is replaced using the refresh token instead of ending the session', async () => {
+      const { auth, http } = setup({ accessToken: 'revoked', expiresAt: FUTURE, refreshToken: 'ref-old' });
+
+      const pending = auth.restoreSession();
+      http.expectOne('/api/auth/me').flush({}, { status: 401, statusText: 'Unauthorized' });
+      await vi.waitFor(() => http.expectOne('/api/auth/refresh').flush(rotated));
+      await vi.waitFor(() => http.expectOne('/api/auth/me').flush(USER));
+      await pending;
+
+      expect(auth.user()).toEqual(USER);
+      expect(auth.accessToken()).toBe('tok-2');
+    });
+
+    it('but when the refresh token is refused as well, that is the end', async () => {
+      const { auth, http } = setup({ accessToken: 'revoked', expiresAt: FUTURE, refreshToken: 'ref-old' });
+
+      const pending = auth.restoreSession();
+      http.expectOne('/api/auth/me').flush({}, { status: 401, statusText: 'Unauthorized' });
+      await vi.waitFor(() => http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' }));
+      await pending;
+
+      expect(auth.isSignedIn()).toBe(false);
+      expect(localStorage.getItem('taskflow.session')).toBeNull();
+    });
+
+    it('a refresh token the server refuses ends the session', async () => {
+      const { auth, http } = setup(expired);
+
+      const pending = auth.restoreSession();
+      http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+      await pending;
+
+      expect(auth.isSignedIn()).toBe(false);
+      expect(localStorage.getItem('taskflow.session')).toBeNull();
+      http.expectNone('/api/auth/me');
+    });
+
+    it.each([[0], [500], [503]])('being unable to ask (status %i) does not sign the user out', async (status) => {
+      const { auth, http } = setup(expired);
+
+      const pending = auth.restoreSession();
+      http.expectOne('/api/auth/refresh').flush({}, { status, statusText: 'x' });
+      await pending;
+
+      expect(auth.canRenew()).toBe(true);
+      expect(localStorage.getItem('taskflow.session')).not.toBeNull();
+    });
+
+    it('callers asking at the same moment share one refresh, because the token works only once', async () => {
+      const { auth, http } = setup(expired);
+
+      const results = Promise.all([auth.renew(), auth.renew(), auth.renew()]);
+      http.expectOne('/api/auth/refresh').flush(rotated);
+
+      expect(await results).toEqual(['renewed', 'renewed', 'renewed']);
+    });
+
+    it('uses the newest refresh token in storage, in case another tab already rotated it', async () => {
+      const { auth, http } = setup(expired);
+      localStorage.setItem('taskflow.session', JSON.stringify({ ...expired, refreshToken: 'ref-from-other-tab' }));
+
+      const pending = auth.renew();
+
+      const request = http.expectOne('/api/auth/refresh');
+      expect(request.request.body).toEqual({ refreshToken: 'ref-from-other-tab' });
+      request.flush(rotated);
+      await pending;
+    });
+
+    it('a session saved before refresh tokens existed cannot be renewed and just expires', async () => {
+      const { auth, http } = setup({ accessToken: 'old', expiresAt: PAST });
+
+      await auth.restoreSession();
+
+      expect(auth.canRenew()).toBe(false);
+      http.expectNone('/api/auth/refresh');
+    });
+  });
+
   describe('signOut', () => {
     it('clears everything and goes to the login page without waiting for the server', () => {
       const { auth, http, navigate } = setup({ accessToken: 't', expiresAt: FUTURE });
@@ -166,6 +265,14 @@ describe('AuthService', () => {
       expect(localStorage.getItem('taskflow.session')).toBeNull();
       expect(navigate).toHaveBeenCalledWith(['/login']);
       expect(http.expectOne('/api/auth/logout').request.method).toBe('POST');
+    });
+
+    it('tells the server which refresh token to end', () => {
+      const { auth, http } = setup({ accessToken: 't', expiresAt: FUTURE, refreshToken: 'ref-9' });
+
+      auth.signOut();
+
+      expect(http.expectOne('/api/auth/logout').request.body).toEqual({ refreshToken: 'ref-9' });
     });
 
     it('is unaffected by the server call failing', () => {

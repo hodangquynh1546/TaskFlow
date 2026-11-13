@@ -33,7 +33,8 @@ export class ProfileService {
     return this.http.put<User>(`${this.base}/users/profile`, request).pipe(tap((user) => this.auth.updateUser(user)));
   }
 
+  /** Naming this device's refresh token lets the server sign out every other device without signing out this one. */
   changePassword(request: ChangePasswordRequest): Observable<void> {
-    return this.http.post<void>(`${this.base}/auth/change-password`, request);
+    return this.http.post<void>(`${this.base}/auth/change-password`, { ...request, refreshToken: this.auth.refreshToken() });
   }
 }

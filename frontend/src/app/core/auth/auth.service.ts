@@ -10,6 +10,9 @@ import { StoredSession, TokenStore } from './token-store';
 
 const NO_SESSION_EXPIRY = new HttpContext().set(HANDLE_UNAUTHORIZED, false);
 
+/** renewed: new tokens saved. rejected: the server refused the refresh token, so the session is over (the caller ends it). unavailable: we could not ask (offline), so nothing changed. */
+export type RenewOutcome = 'renewed' | 'rejected' | 'unavailable';
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -19,6 +22,7 @@ export class AuthService {
 
   private readonly session = signal<StoredSession | null>(this.store.read());
   private readonly currentUser = signal<User | null>(null);
+  private renewing: Promise<RenewOutcome> | null = null;
 
   /** The signed-in user once known; null while loading or when signed out. */
   readonly user = this.currentUser.asReadonly();
@@ -28,6 +32,25 @@ export class AuthService {
   hasValidSession(): boolean {
     const session = this.session();
     return session !== null && Date.parse(session.expiresAt) > Date.now();
+  }
+
+  /** Whether a signed-in device could get a new access token without a password. */
+  canRenew(): boolean {
+    return this.latestRefreshToken() !== null;
+  }
+
+  /** This device's refresh token, for the calls that need to say "this device" (sign out, change password). */
+  refreshToken(): string | null {
+    return this.latestRefreshToken();
+  }
+
+  /**
+   * Trades the refresh token for new tokens. Several callers asking at once share one request, because the refresh
+   * token works once and a second parallel request would look like a replay.
+   */
+  renew(): Promise<RenewOutcome> {
+    this.renewing ??= this.requestRenewal().finally(() => (this.renewing = null));
+    return this.renewing;
   }
 
   accessToken(): string | null {
@@ -47,11 +70,14 @@ export class AuthService {
   }
 
   /**
-   * Signs out immediately. Tokens are stateless (ADR-05) so the server call is a courtesy: we do not wait for it
-   * and a failure changes nothing for the user.
+   * Signs out immediately. The server call ends this device's refresh token so it cannot be used again; we do not
+   * wait for it, and a failure changes nothing for the user (the token still expires on its own).
    */
   signOut(): void {
-    this.http.post<void>(`${this.base}/auth/logout`, null, { context: NO_SESSION_EXPIRY }).pipe(catchError(() => of(null))).subscribe();
+    this.http
+      .post<void>(`${this.base}/auth/logout`, { refreshToken: this.latestRefreshToken() }, { context: NO_SESSION_EXPIRY })
+      .pipe(catchError(() => of(null)))
+      .subscribe();
     this.clearSession();
     void this.router.navigate(['/login']);
   }
@@ -85,21 +111,64 @@ export class AuthService {
    */
   async restoreSession(): Promise<void> {
     if (!this.hasValidSession()) {
-      this.clearSession();
-      return;
-    }
-    try {
-      const user = await firstValueFrom(this.http.get<User>(`${this.base}/auth/me`, { context: NO_SESSION_EXPIRY }));
-      this.currentUser.set(user);
-    } catch (error) {
-      if ((error as { status?: number }).status === 401) {
+      // The access token is short-lived; a stored refresh token turns "expired an hour ago" into "still signed in".
+      if (!this.canRenew() || (await this.renew()) === 'rejected') {
         this.clearSession();
       }
+      if (!this.hasValidSession()) {
+        return;
+      }
+    }
+    try {
+      this.currentUser.set(await this.loadUser());
+    } catch (error) {
+      if ((error as { status?: number }).status !== 401) {
+        return;
+      }
+      // The access token was refused (for example it was revoked). That is not the end while a refresh token can replace it.
+      if (this.canRenew() && (await this.renew()) === 'renewed') {
+        try {
+          this.currentUser.set(await this.loadUser());
+          return;
+        } catch (again) {
+          if ((again as { status?: number }).status !== 401) {
+            return;
+          }
+        }
+      }
+      this.clearSession();
+    }
+  }
+
+  private loadUser(): Promise<User> {
+    return firstValueFrom(this.http.get<User>(`${this.base}/auth/me`, { context: NO_SESSION_EXPIRY }));
+  }
+
+  /** Another tab may have rotated the token since this one loaded, so the stored copy is the newer one. */
+  private latestRefreshToken(): string | null {
+    return this.store.read()?.refreshToken ?? this.session()?.refreshToken ?? null;
+  }
+
+  private async requestRenewal(): Promise<RenewOutcome> {
+    const refreshToken = this.latestRefreshToken();
+    if (refreshToken === null) {
+      return 'rejected';
+    }
+    try {
+      this.startSession(await firstValueFrom(this.http.post<AuthResponse>(`${this.base}/auth/refresh`, { refreshToken }, { context: NO_SESSION_EXPIRY })));
+      return 'renewed';
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      // Only a definite "no" ends the session; a dropped connection or a server hiccup must not sign anyone out.
+      if (status === 401 || status === 400) {
+        return 'rejected';
+      }
+      return 'unavailable';
     }
   }
 
   private startSession(response: AuthResponse): void {
-    const session: StoredSession = { accessToken: response.accessToken, expiresAt: response.expiresAt };
+    const session: StoredSession = { accessToken: response.accessToken, expiresAt: response.expiresAt, refreshToken: response.refreshToken };
     this.store.write(session);
     this.session.set(session);
     this.currentUser.set(response.user);

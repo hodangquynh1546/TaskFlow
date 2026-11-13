@@ -12,7 +12,10 @@ public sealed class FrozenClock : TimeProvider
         Now = new DateTimeOffset(real.Year, real.Month, real.Day, real.Hour, real.Minute, real.Second, TimeSpan.Zero);
     }
 
-    public DateTimeOffset Now { get; }
+    public DateTimeOffset Now { get; private set; }
+
+    /// <summary>Moves time forward, for tokens that expire in days.</summary>
+    public void Advance(TimeSpan by) => Now += by;
 
     public override DateTimeOffset GetUtcNow() => Now;
 }

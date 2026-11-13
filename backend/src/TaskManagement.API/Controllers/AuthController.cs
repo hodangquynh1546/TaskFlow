@@ -27,10 +27,28 @@ public sealed class AuthController(IAuthService auth, IUserProfileService profil
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request, CancellationToken cancellationToken) =>
         await auth.LoginAsync(request, cancellationToken);
 
-    /// <summary>Tokens are stateless, so there is nothing to revoke server-side (ADR-05); the client discards its token.</summary>
+    /// <summary>Trades a refresh token for a new access token and a new refresh token; the old refresh token stops working.</summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
+    [ProducesResponseType<AuthResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AuthResponse>> Refresh(RefreshRequest request, CancellationToken cancellationToken) =>
+        await auth.RefreshAsync(request, cancellationToken);
+
+    /// <summary>
+    /// Ends this device's session on the server. Anonymous on purpose: the refresh token is the credential, and a
+    /// device whose access token has already expired must still be able to sign out.
+    /// </summary>
     [HttpPost("logout")]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public IActionResult Logout() => NoContent();
+    public async Task<IActionResult> Logout(LogoutRequest? request, CancellationToken cancellationToken)
+    {
+        await auth.LogoutAsync(request ?? new LogoutRequest(null), cancellationToken);
+        return NoContent();
+    }
 
     [HttpGet("me")]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]

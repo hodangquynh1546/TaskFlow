@@ -50,10 +50,12 @@ describe('ProfileService', () => {
 
   it('changes the password through the auth endpoint', () => {
     const { service, http } = setup();
+    localStorage.setItem('taskflow.session', JSON.stringify({ accessToken: 't', expiresAt: '2999-01-01T00:00:00Z', refreshToken: 'this-device' }));
 
     service.changePassword({ currentPassword: 'a', newPassword: 'b' }).subscribe();
     const req = http.expectOne('/api/auth/change-password');
 
-    expect([req.request.method, req.request.body]).toEqual(['POST', { currentPassword: 'a', newPassword: 'b' }]);
+    // Naming this device's refresh token is what lets the server keep it signed in while ending the others.
+    expect([req.request.method, req.request.body]).toEqual(['POST', { currentPassword: 'a', newPassword: 'b', refreshToken: 'this-device' }]);
   });
 });

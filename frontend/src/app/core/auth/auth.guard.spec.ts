@@ -5,7 +5,7 @@ import { authGuard, guestGuard } from './auth.guard';
 
 const NOW = new Date('2026-11-12T10:00:00Z');
 
-function setup(session?: { accessToken: string; expiresAt: string }) {
+function setup(session?: { accessToken: string; expiresAt: string; refreshToken?: string }) {
   localStorage.clear();
   if (session) {
     localStorage.setItem('taskflow.session', JSON.stringify(session));
@@ -29,6 +29,18 @@ describe('guards', () => {
       setup({ accessToken: 't', expiresAt: '2026-11-12T11:00:00Z' });
 
       expect(run(authGuard)).toBe(true);
+    });
+
+    it('lets a user through whose access token has expired but whose device can renew it', () => {
+      setup({ accessToken: 't', expiresAt: '2026-11-12T09:00:00Z', refreshToken: 'r' });
+
+      expect(run(authGuard)).toBe(true);
+    });
+
+    it('sends a user with an expired token and no refresh token to login', () => {
+      const router = setup({ accessToken: 't', expiresAt: '2026-11-12T09:00:00Z' });
+
+      expect(router.serializeUrl(run(authGuard) as UrlTree)).toContain('/login');
     });
 
     it('sends a visitor to login and remembers where they were going', () => {

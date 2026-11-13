@@ -10,6 +10,7 @@ public interface IAppDbContext
 {
     DbSet<User> Users { get; }
     DbSet<TaskItem> Tasks { get; }
+    DbSet<RefreshToken> RefreshTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

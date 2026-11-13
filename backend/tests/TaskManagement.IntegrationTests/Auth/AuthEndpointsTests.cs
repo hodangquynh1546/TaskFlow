@@ -311,20 +311,21 @@ public sealed class AuthEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Logout_returns_204_for_a_signed_in_user_and_401_otherwise()
+    public async Task Logout_always_answers_204_even_with_no_body_or_an_unknown_token()
     {
         var user = await _api.RegisterAsync();
 
         Assert.Equal(HttpStatusCode.NoContent, (await user.Client.PostAsync("/api/auth/logout", null)).StatusCode);
-        await (await _api.Anonymous().PostAsync("/api/auth/logout", null)).ReadProblemAsync(401);
+        Assert.Equal(HttpStatusCode.NoContent, (await _api.Anonymous().PostAsJsonAsync("/api/auth/logout", new { refreshToken = "never-issued" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await _api.Anonymous().PostAsJsonAsync("/api/auth/logout", new { refreshToken = new string('x', 5000) })).StatusCode);
     }
 
     [Fact]
-    public async Task Logout_is_stateless_so_the_token_stays_valid_until_it_expires()
+    public async Task An_access_token_stays_valid_after_logout_until_it_expires()
     {
-        // Known, documented limitation (ADR-05): without a token store the server cannot revoke a JWT.
+        // Access tokens are stateless (ADR-05): logout ends the refresh token, so the session cannot be renewed.
         var user = await _api.RegisterAsync();
-        await user.Client.PostAsync("/api/auth/logout", null);
+        await _api.Anonymous().PostAsJsonAsync("/api/auth/logout", new { refreshToken = user.RefreshToken });
 
         Assert.Equal(HttpStatusCode.OK, (await user.Client.GetAsync("/api/auth/me")).StatusCode);
     }

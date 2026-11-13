@@ -5,3 +5,6 @@ import { HttpContextToken } from '@angular/common/http';
  * (a 401 there is just a wrong password) and for the silent session check at startup.
  */
 export const HANDLE_UNAUTHORIZED = new HttpContextToken<boolean>(() => true);
+
+/** Set on the one automatic retry after a refresh, so a request that is still refused does not loop. */
+export const RENEWAL_TRIED = new HttpContextToken<boolean>(() => false);

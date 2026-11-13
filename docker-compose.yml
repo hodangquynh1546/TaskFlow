@@ -34,6 +34,7 @@ services:
       Jwt__Issuer: ${Jwt__Issuer:-TaskFlow}
       Jwt__Audience: ${Jwt__Audience:-TaskFlow.Client}
       Jwt__ExpiresMinutes: ${Jwt__ExpiresMinutes:-60}
+      Jwt__RefreshDays: ${Jwt__RefreshDays:-90}
       # Only the web container can reach this service (no published port), so trusting the compose network is safe.
       ForwardedHeaders__Enabled: "true"
       ForwardedHeaders__KnownNetworks__0: 172.16.0.0/12

@@ -9,7 +9,8 @@ const DEFAULT_LANDING: readonly string[] = ['/', '/dashboard'];
 /** Keeps signed-out visitors out of the app and remembers where they were going. */
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
-  if (auth.hasValidSession()) {
+  // An expired access token is fine while the device can renew it: the first request does that quietly.
+  if (auth.hasValidSession() || auth.canRenew()) {
     return true;
   }
   auth.clearSession();
@@ -19,5 +20,6 @@ export const authGuard: CanActivateFn = (_route, state) => {
 
 /** Pages for signed-out visitors (login, register); signed-in users are sent home instead. */
 export const guestGuard: CanActivateFn = () => {
-  return inject(AuthService).hasValidSession() ? inject(Router).createUrlTree(['/']) : true;
+  const auth = inject(AuthService);
+  return auth.hasValidSession() || auth.canRenew() ? inject(Router).createUrlTree(['/']) : true;
 };

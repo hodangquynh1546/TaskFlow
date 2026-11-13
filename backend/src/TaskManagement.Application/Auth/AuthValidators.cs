@@ -26,6 +26,15 @@ public sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
     }
 }
 
+public sealed class RefreshRequestValidator : AbstractValidator<RefreshRequest>
+{
+    public RefreshRequestValidator()
+    {
+        RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("Mã làm mới phiên không hợp lệ.")
+            .MaximumLength(RefreshTokens.MaxLength).WithMessage("Mã làm mới phiên không hợp lệ.");
+    }
+}
+
 public sealed class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
     public ChangePasswordRequestValidator()

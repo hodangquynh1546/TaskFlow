@@ -11,7 +11,7 @@ namespace TaskManagement.IntegrationTests.Security;
 [Collection(PostgresCollection.Name)]
 public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposable
 {
-    private static readonly string[] PublicEndpoints = ["POST api/auth/login", "POST api/auth/register"];
+    private static readonly string[] PublicEndpoints = ["POST api/auth/login", "POST api/auth/logout", "POST api/auth/refresh", "POST api/auth/register"];
 
     private readonly ApiFactory _factory = new(postgres.ConnectionString);
 
@@ -43,6 +43,7 @@ public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposa
                 "POST api/auth/change-password",
                 "POST api/auth/login",
                 "POST api/auth/logout",
+                "POST api/auth/refresh",
                 "POST api/auth/register",
                 "POST api/tasks",
                 "PUT api/tasks/{id:guid}",
@@ -52,7 +53,7 @@ public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposa
     }
 
     [Fact]
-    public void Only_login_and_register_are_marked_anonymous()
+    public void Only_the_sign_in_family_of_endpoints_is_marked_anonymous()
     {
         var anonymous = ApiEndpoints()
             .Where(e => e.Endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null)
@@ -67,7 +68,7 @@ public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposa
     {
         using var client = _factory.CreateClient();
         var protectedEndpoints = ApiEndpoints().Where(e => !PublicEndpoints.Contains($"{e.Method} {e.Pattern}")).ToList();
-        Assert.Equal(15, protectedEndpoints.Count);
+        Assert.Equal(14, protectedEndpoints.Count);
 
         foreach (var (method, pattern, _) in protectedEndpoints)
         {

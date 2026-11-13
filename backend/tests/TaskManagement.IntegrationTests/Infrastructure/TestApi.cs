@@ -14,6 +14,9 @@ public sealed class TestUser(Guid id, string email, string password, string toke
     public string Password { get; } = password;
     public string Token { get; } = token;
 
+    /// <summary>The long-lived token issued at sign-up, for the "stay signed in" flow.</summary>
+    public string RefreshToken { get; init; } = string.Empty;
+
     /// <summary>A client that sends this user's bearer token.</summary>
     public HttpClient Client { get; } = client;
 
@@ -50,7 +53,10 @@ public sealed class TestApi(ApiFactory factory, PostgresFixture postgres)
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var token = body.GetProperty("accessToken").GetString()!;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return new TestUser(body.GetProperty("user").GetProperty("id").GetGuid(), body.GetProperty("user").GetProperty("email").GetString()!, password, token, client);
+        return new TestUser(body.GetProperty("user").GetProperty("id").GetGuid(), body.GetProperty("user").GetProperty("email").GetString()!, password, token, client)
+        {
+            RefreshToken = body.GetProperty("refreshToken").GetString()!,
+        };
     }
 
     public static string UniqueEmail() => $"user-{Guid.NewGuid():N}@example.com";

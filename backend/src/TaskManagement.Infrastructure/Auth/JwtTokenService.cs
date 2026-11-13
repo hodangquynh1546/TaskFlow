@@ -12,6 +12,8 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options, TimeProvider
 {
     private readonly JwtOptions _options = options.Value;
 
+    public TimeSpan RefreshLifetime => TimeSpan.FromDays(_options.RefreshDays);
+
     public AccessToken Create(User user)
     {
         var now = clock.GetUtcNow();

@@ -3,13 +3,20 @@ import { Injectable } from '@angular/core';
 export interface StoredSession {
   accessToken: string;
   expiresAt: string;
+  /** What keeps the user signed in after the access token expires. Absent in sessions saved by older versions. */
+  refreshToken?: string;
 }
 
 const STORAGE_KEY = 'taskflow.session';
 
 function isStoredSession(value: unknown): value is StoredSession {
   const v = value as Partial<StoredSession> | null;
-  return typeof v?.accessToken === 'string' && typeof v?.expiresAt === 'string' && !Number.isNaN(Date.parse(v.expiresAt));
+  return (
+    typeof v?.accessToken === 'string' &&
+    typeof v?.expiresAt === 'string' &&
+    !Number.isNaN(Date.parse(v.expiresAt)) &&
+    (v.refreshToken === undefined || typeof v.refreshToken === 'string')
+  );
 }
 
 /**

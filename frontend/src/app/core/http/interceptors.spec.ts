@@ -12,8 +12,10 @@ import { HANDLE_UNAUTHORIZED } from './http-context';
 
 const NOW = new Date('2026-11-12T10:00:00Z');
 const SESSION = { accessToken: 'secret-token', expiresAt: '2026-11-12T11:00:00Z' };
+const RENEWABLE = { accessToken: 'old-token', expiresAt: '2026-11-12T09:00:00Z', refreshToken: 'ref-1' };
+const NEW_TOKENS = { accessToken: 'new-token', expiresAt: '2026-11-12T11:00:00Z', refreshToken: 'ref-2', user: { id: 'u', fullName: 'A', email: 'a@x.com', createdAt: '', updatedAt: '' } };
 
-function setup(session?: typeof SESSION) {
+function setup(session?: typeof SESSION | typeof RENEWABLE | { accessToken: string; expiresAt: string; refreshToken?: string }) {
   localStorage.clear();
   if (session) {
     localStorage.setItem('taskflow.session', JSON.stringify(session));
@@ -107,6 +109,106 @@ describe('HTTP interceptors', () => {
       auth.signOut();
 
       expect(mock.expectOne('/api/auth/logout').request.headers.get('Authorization')).toBe('Bearer secret-token');
+    });
+  });
+
+  describe('staying signed in', () => {
+    const live = { accessToken: 'secret-token', expiresAt: '2026-11-12T11:00:00Z', refreshToken: 'ref-1' };
+
+    it('renews an expired access token first, then sends the call with the new one', () => {
+      const { http, mock } = setup(RENEWABLE);
+      let body: unknown;
+
+      http.get('/api/tasks').subscribe((b) => (body = b));
+      mock.expectNone('/api/tasks');
+      mock.expectOne('/api/auth/refresh').flush(NEW_TOKENS);
+      return vi.waitFor(() => {
+        const call = mock.expectOne('/api/tasks');
+        expect(call.request.headers.get('Authorization')).toBe('Bearer new-token');
+        call.flush({ ok: true });
+        expect(body).toEqual({ ok: true });
+      });
+    });
+
+    it('a refused token is renewed and the call repeated once, invisibly to the caller', () => {
+      const { http, mock, navigate } = setup(live);
+      let body: unknown;
+
+      http.get('/api/tasks').subscribe((b) => (body = b));
+      mock.expectOne('/api/tasks').flush({}, { status: 401, statusText: 'Unauthorized' });
+      mock.expectOne('/api/auth/refresh').flush(NEW_TOKENS);
+      return vi.waitFor(() => {
+        const again = mock.expectOne('/api/tasks');
+        expect(again.request.headers.get('Authorization')).toBe('Bearer new-token');
+        again.flush({ ok: 1 });
+        expect(body).toEqual({ ok: 1 });
+        expect(navigate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('several calls refused together trigger one refresh', () => {
+      const { http, mock } = setup(live);
+
+      for (const path of ['/api/a', '/api/b', '/api/c']) {
+        http.get(path).subscribe({ error: () => undefined });
+      }
+      for (const path of ['/api/a', '/api/b', '/api/c']) {
+        mock.expectOne(path).flush({}, { status: 401, statusText: 'Unauthorized' });
+      }
+
+      mock.expectOne('/api/auth/refresh').flush(NEW_TOKENS);
+    });
+
+    it('if the repeated call is refused as well the user gets that error and nothing loops', () => {
+      const { http, mock } = setup(live);
+      let error: unknown;
+
+      http.get('/api/tasks').subscribe({ error: (e) => (error = e) });
+      mock.expectOne('/api/tasks').flush({}, { status: 401, statusText: 'Unauthorized' });
+      mock.expectOne('/api/auth/refresh').flush(NEW_TOKENS);
+      return vi.waitFor(() => {
+        mock.expectOne('/api/tasks').flush({}, { status: 401, statusText: 'Unauthorized' });
+        expect(error).toBeInstanceOf(ApiError);
+        mock.expectNone('/api/auth/refresh');
+      });
+    });
+
+    it('when the refresh token is refused too, the session ends and the user goes to login', () => {
+      const { http, mock, navigate, auth } = setup(live);
+
+      http.get('/api/tasks').subscribe({ error: () => undefined });
+      mock.expectOne('/api/tasks').flush({}, { status: 401, statusText: 'Unauthorized' });
+      mock.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+      return vi.waitFor(() => {
+        expect(auth.isSignedIn()).toBe(false);
+        expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { reason: 'expired', returnUrl: '/tasks' } });
+      });
+    });
+
+    it('being unable to reach the server for the refresh does not sign the user out', () => {
+      const { http, mock, navigate, auth } = setup(live);
+      let error: unknown;
+
+      http.get('/api/tasks').subscribe({ error: (e) => (error = e) });
+      mock.expectOne('/api/tasks').flush({}, { status: 401, statusText: 'Unauthorized' });
+      mock.expectOne('/api/auth/refresh').flush({}, { status: 0, statusText: 'x' });
+
+      return vi.waitFor(() => {
+        expect(error).toBeInstanceOf(ApiError);
+        expect(auth.isSignedIn()).toBe(true);
+        expect(navigate).not.toHaveBeenCalled();
+      });
+    });
+
+    it('the refresh call itself never triggers another refresh', () => {
+      const { http, mock, auth } = setup(RENEWABLE);
+
+      void auth.renew();
+      mock.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+      mock.expectNone('/api/auth/refresh');
+      expect(http).toBeDefined();
     });
   });
 
