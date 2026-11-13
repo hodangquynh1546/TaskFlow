@@ -97,6 +97,22 @@ public sealed class TaskQueryTests : IDisposable
     }
 
     [Fact]
+    public async Task Sort_by_start_time_orders_the_day_and_breaks_ties_by_deadline_with_unscheduled_tasks_last()
+    {
+        var user = await _api.RegisterAsync();
+        var day = Now.AddDays(1);
+        await _api.SeedTaskAsync(user.Id, "13th-12h", start: day.AddHours(4), created: Now.AddMinutes(-9));
+        await _api.SeedTaskAsync(user.Id, "unscheduled", created: Now.AddMinutes(-8));
+        await _api.SeedTaskAsync(user.Id, "13th-08h-late", start: day, due: day.AddDays(3), created: Now.AddMinutes(-7));
+        await _api.SeedTaskAsync(user.Id, "14th-08h", start: day.AddDays(1), created: Now.AddMinutes(-6));
+        await _api.SeedTaskAsync(user.Id, "13th-08h-early", start: day, due: day.AddDays(1), created: Now.AddMinutes(-5));
+
+        var asc = (await Page(user, ("sortBy", "startDate"), ("sortDir", "asc"))).Titles();
+
+        Assert.Equal(["13th-08h-early", "13th-08h-late", "13th-12h", "14th-08h", "unscheduled"], asc);
+    }
+
+    [Fact]
     public async Task Sort_by_priority_orders_by_importance_then_newest_first()
     {
         var user = await _api.RegisterAsync();

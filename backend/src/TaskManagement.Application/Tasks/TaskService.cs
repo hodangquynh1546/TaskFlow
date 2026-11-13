@@ -162,8 +162,8 @@ internal sealed class TaskService(
         {
             (TaskSortField.DueDate, false) => tasks.OrderBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
             (TaskSortField.DueDate, true) => tasks.OrderBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
-            (TaskSortField.StartDate, false) => tasks.OrderBy(t => t.StartDate == null).ThenBy(t => t.StartDate),
-            (TaskSortField.StartDate, true) => tasks.OrderBy(t => t.StartDate == null).ThenByDescending(t => t.StartDate),
+            (TaskSortField.StartDate, false) => tasks.OrderBy(t => t.StartDate == null).ThenBy(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenBy(t => t.DueDate),
+            (TaskSortField.StartDate, true) => tasks.OrderBy(t => t.StartDate == null).ThenByDescending(t => t.StartDate).ThenBy(t => t.DueDate == null).ThenByDescending(t => t.DueDate),
             (TaskSortField.Priority, false) => tasks.OrderBy(t => t.Priority).ThenByDescending(t => t.CreatedAt),
             (TaskSortField.Priority, true) => tasks.OrderByDescending(t => t.Priority).ThenByDescending(t => t.CreatedAt),
             (_, false) => tasks.OrderBy(t => t.CreatedAt),

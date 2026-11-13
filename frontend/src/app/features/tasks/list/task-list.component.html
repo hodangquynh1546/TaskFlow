@@ -84,12 +84,7 @@
       } @else {
         <ul class="rows" role="list">
           @for (task of page.items; track task.id; let i = $index) {
-            <li class="row tf-sticker tf-rise" [style.--i]="i" [class.row--done]="task.status === 'Completed'" [class.row--busy]="isBusy(task.id)">
-              <button type="button" class="check" [disabled]="isBusy(task.id)" (click)="toggleDone(task, $event)"
-                      [attr.aria-label]="(task.status === 'Completed' ? 'tasks.rowReopen' : 'tasks.rowComplete') | t: { title: task.title }">
-                <tf-status [status]="task.status" [compact]="true" />
-              </button>
-
+            <li class="row tf-sticker tf-rise" [style.--i]="i" [class.row--done]="task.status === 'Completed'" [class.row--overdue]="task.isOverdue" [class.row--busy]="isBusy(task.id)">
               <div class="row__main">
                 <a class="row__title" [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
                 @if (task.startDate || task.durationMinutes !== null) {
@@ -102,12 +97,20 @@
 
               <div class="row__meta">
                 <tf-priority [priority]="task.priority" />
-                <tf-status class="row__status" [status]="task.status" />
                 <!-- A missing deadline is the normal case; repeating "no deadline" on every row is noise. -->
                 @if (task.dueDate) {
                   <tf-due [dueDate]="task.dueDate" [status]="task.status" />
                 } @else {
                   <span></span>
+                }
+              </div>
+
+              <div class="row__status seg" role="group" [attr.aria-label]="'tasks.statusGroup' | t: { title: task.title }">
+                @for (status of statuses; track status) {
+                  <button type="button" class="seg__btn" [class]="'seg__btn seg__btn--' + status" [attr.aria-pressed]="task.status === status"
+                          [disabled]="isBusy(task.id)" (click)="chooseStatus(task, status, $event)">
+                    {{ i18n.t(statusKeys[status]) }}
+                  </button>
                 }
               </div>
 
@@ -118,12 +121,6 @@
               <nz-dropdown-menu #menu="nzDropdownMenu">
                 <ul nz-menu>
                   <li nz-menu-item [routerLink]="['/tasks', task.id, 'edit']">{{ 'common.edit' | t }}</li>
-                  @if (task.status !== 'InProgress') {
-                    <li nz-menu-item (click)="setTaskStatus(task, 'InProgress')">{{ 'tasks.menuToDoing' | t }}</li>
-                  }
-                  @if (task.status !== 'Todo') {
-                    <li nz-menu-item (click)="setTaskStatus(task, 'Todo')">{{ 'tasks.menuToTodo' | t }}</li>
-                  }
                   <li nz-menu-divider></li>
                   <li nz-menu-item class="menu-danger" (click)="remove(task)">{{ 'common.delete' | t }}</li>
                 </ul>

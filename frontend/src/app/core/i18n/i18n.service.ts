@@ -1,28 +1,42 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { NzI18nService, en_US, vi_VN } from 'ng-zorro-antd/i18n';
+import { NzI18nInterface, NzI18nService, en_US, ja_JP, vi_VN, zh_CN } from 'ng-zorro-antd/i18n';
 
 import { en } from './messages/en';
+import { ja } from './messages/ja';
 import { MessageKey, vi } from './messages/vi';
+import { zh } from './messages/zh';
 
-export type Lang = 'vi' | 'en';
+export type Lang = 'vi' | 'en' | 'ja' | 'zh';
 export type MessageParams = Readonly<Record<string, string | number>>;
 
 export const LANGUAGES: readonly { readonly code: Lang; readonly label: string; readonly short: string }[] = [
   { code: 'vi', label: 'Tiếng Việt', short: 'VI' },
   { code: 'en', label: 'English', short: 'EN' },
+  { code: 'ja', label: '日本語', short: 'JA' },
+  { code: 'zh', label: '简体中文', short: 'ZH' },
 ];
 
 const STORAGE_KEY = 'tf.lang';
-const DICTIONARIES: Record<Lang, Readonly<Record<MessageKey, string>>> = { vi, en };
-const INTL_LOCALE: Record<Lang, string> = { vi: 'vi-VN', en: 'en-US' };
+const DICTIONARIES: Record<Lang, Readonly<Record<MessageKey, string>>> = { vi, en, ja, zh };
+const INTL_LOCALE: Record<Lang, string> = { vi: 'vi-VN', en: 'en-US', ja: 'ja-JP', zh: 'zh-CN' };
+const NZ_LOCALE: Record<Lang, NzI18nInterface> = { vi: vi_VN, en: en_US, ja: ja_JP, zh: zh_CN };
+const LANGUAGE_CODES: readonly Lang[] = ['vi', 'en', 'ja', 'zh'];
 
 /** Browser preference decides only the first visit; after that the stored choice wins. */
 export function detectLanguage(stored: string | null, browserLanguages: readonly string[]): Lang {
-  if (stored === 'vi' || stored === 'en') {
-    return stored;
+  const saved = LANGUAGE_CODES.find((code) => code === stored);
+  if (saved) {
+    return saved;
   }
-  return browserLanguages.some((l) => l.toLowerCase().startsWith('vi')) ? 'vi' : browserLanguages.length > 0 ? 'en' : 'vi';
+  // The first browser language we support wins, so a Japanese browser that also lists English opens in Japanese.
+  for (const tag of browserLanguages) {
+    const match = LANGUAGE_CODES.find((code) => tag.toLowerCase().startsWith(code));
+    if (match) {
+      return match;
+    }
+  }
+  return browserLanguages.length > 0 ? 'en' : 'vi';
 }
 
 function readStored(): string | null {
@@ -88,7 +102,7 @@ export class I18nService {
 
   private apply(lang: Lang): void {
     this.document.documentElement.lang = lang;
-    this.nzI18n?.setLocale(lang === 'vi' ? vi_VN : en_US);
+    this.nzI18n?.setLocale(NZ_LOCALE[lang]);
   }
 }
 

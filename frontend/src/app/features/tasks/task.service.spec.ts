@@ -36,8 +36,8 @@ describe('TaskService', () => {
       const { req, params } = request({});
 
       expect(req.request.method).toBe('GET');
-      expect(params.get('sortBy')).toBe('createdAt');
-      expect(params.get('sortDir')).toBe('desc');
+      expect(params.get('sortBy')).toBe('startDate');
+      expect(params.get('sortDir')).toBe('asc');
       expect(params.get('page')).toBe('1');
       expect(params.get('pageSize')).toBe('10');
     });

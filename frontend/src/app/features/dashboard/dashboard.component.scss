@@ -16,6 +16,7 @@
 .overdue { display: flex; flex-wrap: wrap; gap: var(--tf-space-1) var(--tf-space-4); align-items: center; margin-top: var(--tf-space-3); }
 .overdue__text { font-weight: 700; }
 
+.report-wide { grid-column: 1 / -1; display: block; }
 .list-panel { grid-column: span 5; padding: var(--tf-space-6); }
 .list-panel--wide { grid-column: span 7; }
 .list-title { font-size: var(--tf-text-h3); margin-bottom: var(--tf-space-3); }

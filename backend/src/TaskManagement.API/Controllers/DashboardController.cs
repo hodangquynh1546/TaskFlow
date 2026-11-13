@@ -24,4 +24,10 @@ public sealed class DashboardController(IDashboardService dashboard) : Controlle
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<TaskDto>>> Recent([FromQuery] RecentTasksQuery query, CancellationToken cancellationToken) =>
         Ok(await dashboard.GetRecentAsync(query, cancellationToken));
+
+    [HttpGet("report")]
+    [ProducesResponseType<ReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ReportDto>> Report([FromQuery] ReportQuery query, CancellationToken cancellationToken) =>
+        Ok(await dashboard.GetReportAsync(query, cancellationToken));
 }

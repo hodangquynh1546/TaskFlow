@@ -89,7 +89,7 @@ describe('TaskListComponent', () => {
 
       expect(row.querySelector('.row__description')!.textContent).toBe('Báo cáo quý 4');
       expect(row.querySelector('tf-priority')).not.toBeNull();
-      expect(row.querySelector('.row__meta tf-status')!.textContent).toContain('Hoàn thành');
+      expect(row.querySelector('.seg__btn--Completed')!.getAttribute('aria-pressed')).toBe('true');
       expect(row.querySelector('tf-due')).not.toBeNull();
       expect(row.classList.contains('row--done')).toBe(true);
     });
@@ -97,7 +97,7 @@ describe('TaskListComponent', () => {
     it('gives every row action an accessible name that includes the task title', async () => {
       const { el } = await setup('/tasks', of(page([task({ title: 'Họp nhóm' })])));
 
-      expect(el.querySelector('.check')!.getAttribute('aria-label')).toBe('Đánh dấu hoàn thành: Họp nhóm');
+      expect(el.querySelector('.seg')!.getAttribute('aria-label')).toBe('Trạng thái của Họp nhóm');
       expect(el.querySelector('.row__menu')!.getAttribute('aria-label')).toBe('Thao tác với Họp nhóm');
     });
   });
@@ -131,8 +131,8 @@ describe('TaskListComponent', () => {
       el.querySelector<HTMLButtonElement>('.toolbar__direction')!.click();
       await settle();
 
-      expect(router.url).toBe('/tasks?sortDir=asc');
-      expect(lastQuery()).toMatchObject({ sortDir: 'asc', page: 1 });
+      expect(router.url).toBe('/tasks?sortDir=desc');
+      expect(lastQuery()).toMatchObject({ sortDir: 'desc', page: 1 });
     });
 
     it('describes the current direction on the sort button', async () => {
@@ -316,11 +316,24 @@ describe('TaskListComponent', () => {
   });
 
   describe('changing status from the list', () => {
-    it('the circle finishes an open task, tells the user, and refreshes in place without a skeleton', async () => {
+    const button = (el: HTMLElement, row: number, status: string) =>
+      el.querySelectorAll('.row')[row].querySelector<HTMLButtonElement>(`.seg__btn--${status}`)!;
+
+    it('shows all three statuses on every row and marks the current one', async () => {
+      const { el } = await setup();
+
+      const labels = [...el.querySelectorAll('.row')[0].querySelectorAll('.seg__btn')].map((b) => b.textContent!.trim());
+      expect(labels).toEqual(['Chưa làm', 'Đang làm', 'Hoàn thành']);
+      expect(button(el, 0, 'Todo').getAttribute('aria-pressed')).toBe('true');
+      expect(button(el, 0, 'Completed').getAttribute('aria-pressed')).toBe('false');
+      expect(button(el, 1, 'Completed').getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('"Hoàn thành" finishes an open task, tells the user, and refreshes in place without a skeleton', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(of(task()));
 
-      el.querySelector<HTMLButtonElement>('.check')!.click();
+      button(el, 0, 'Completed').click();
       await settle();
 
       expect(service.changeStatus).toHaveBeenCalledWith('a', 'Completed');
@@ -329,24 +342,35 @@ describe('TaskListComponent', () => {
       expect(el.querySelector('[aria-busy="true"]')).toBeNull();
     });
 
-    it('the circle re-opens a finished task as "Chưa làm"', async () => {
+    it('"Đang làm" and "Chưa làm" set exactly that status', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(of(task()));
-      const finishedRow = el.querySelectorAll<HTMLButtonElement>('.check')[1];
 
-      expect(finishedRow.getAttribute('aria-label')).toBe('Mở lại: Việc B');
-      finishedRow.click();
+      button(el, 0, 'InProgress').click();
+      await settle();
+      expect(service.changeStatus).toHaveBeenLastCalledWith('a', 'InProgress');
+      expect(notify.success).toHaveBeenLastCalledWith('Đã chuyển sang Đang làm');
+
+      button(el, 1, 'Todo').click();
+      await settle();
+      expect(service.changeStatus).toHaveBeenLastCalledWith('b', 'Todo');
+      expect(notify.success).toHaveBeenLastCalledWith('Đã chuyển sang Chưa làm');
+    });
+
+    it('pressing the status a task already has sends nothing', async () => {
+      const { el, service, settle } = await setup();
+
+      button(el, 0, 'Todo').click();
       await settle();
 
-      expect(service.changeStatus).toHaveBeenCalledWith('b', 'Todo');
-      expect(notify.success).toHaveBeenCalledWith('Đã chuyển sang Chưa làm');
+      expect(service.changeStatus).not.toHaveBeenCalled();
     });
 
     it('a failed change is reported and does not refresh the list', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(throwError(() => new ApiError(404, 'Không tìm thấy công việc.')));
 
-      el.querySelector<HTMLButtonElement>('.check')!.click();
+      button(el, 0, 'Completed').click();
       await settle();
 
       expect(notify.error).toHaveBeenCalledWith('Không tìm thấy công việc.');
@@ -356,15 +380,28 @@ describe('TaskListComponent', () => {
     it('a row is locked while its change is in flight, so a double click sends one request', async () => {
       const { el, service, settle } = await setup();
       service.changeStatus.mockReturnValue(new Subject());
-      const circle = el.querySelector<HTMLButtonElement>('.check')!;
+      const done = button(el, 0, 'Completed');
 
-      circle.click();
+      done.click();
       await settle();
-      circle.click();
+      done.click();
 
       expect(service.changeStatus).toHaveBeenCalledTimes(1);
-      expect(circle.disabled).toBe(true);
+      expect(done.disabled).toBe(true);
       expect(el.querySelector('.row')!.classList.contains('row--busy')).toBe(true);
+    });
+  });
+
+  describe('overdue rows', () => {
+    it('are flagged red; on-time and finished rows are not', async () => {
+      const { el } = await setup('/tasks', of(page([
+        task({ id: 'x', title: 'Trễ', isOverdue: true, dueDate: '2026-11-01T00:00:00Z' }),
+        task({ id: 'y', title: 'Đúng hạn' }),
+        task({ id: 'z', title: 'Xong', status: 'Completed' }),
+      ])));
+
+      const flags = [...el.querySelectorAll('.row')].map((r) => r.classList.contains('row--overdue'));
+      expect(flags).toEqual([true, false, false]);
     });
   });
 

@@ -11,8 +11,10 @@
 @mint: #5fe0a4;           // Completed
 @bubblegum: #ff7aae;      // high priority, overdue, errors
 
-@font-display: 'Baloo 2', 'Be Vietnam Pro', system-ui, sans-serif;
-@font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+// Neither web font has Japanese or Chinese glyphs, so those fall through to the system's own CJK faces.
+@font-cjk: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'PingFang SC', 'Yu Gothic', 'Microsoft YaHei', 'Noto Sans CJK JP', 'Noto Sans CJK SC';
+@font-display: 'Baloo 2', 'Be Vietnam Pro', system-ui, @font-cjk, sans-serif;
+@font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, @font-cjk, sans-serif;
 
 // ---- NG-ZORRO ------------------------------------------------------------
 // Only the NG-ZORRO components we actually use: the full bundle is ~740 KB of CSS and would blow the budget.
@@ -96,6 +98,8 @@
   --tf-lemon: @lemon;
   --tf-mint: @mint;
   --tf-bubblegum: @bubblegum;
+  --tf-alarm: #d62839; // overdue only: a real red, distinct from the pink used for high priority
+  --tf-alarm-tint: #ffe3e6;
   --tf-tangerine-tint: #ffe6d2;
   --tf-sky-tint: #e1efff;
   --tf-lemon-tint: #fff3c0;
@@ -123,6 +127,7 @@
   --tf-lemon-tint: #4b4420;
   --tf-mint-tint: #1f4b3b;
   --tf-bubblegum-tint: #50263f;
+  --tf-alarm-tint: #4d1d27;
 
   --tf-hero: #2e2a6a;
   --tf-skeleton-a: #2a2560;

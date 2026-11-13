@@ -35,7 +35,6 @@ import { ConfirmService } from '../../../shared/ui/confirm.service';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
 import { PriorityMarkerComponent } from '../../../shared/ui/priority-marker.component';
-import { StatusIndicatorComponent } from '../../../shared/ui/status-indicator.component';
 import { TimeBlockComponent } from '../../../shared/ui/time-block.component';
 import {
   PAGE_SIZES,
@@ -66,7 +65,7 @@ const SORT_KEYS: Readonly<Record<TaskSortField, MessageKey>> = {
   imports: [
     FormsModule, ReactiveFormsModule, RouterLink,
     NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzDropDownModule, NzIconModule, NzInputModule, NzMenuModule, NzPaginationModule, NzSelectModule,
-    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, PriorityMarkerComponent, StatusIndicatorComponent, TimeBlockComponent, TranslatePipe,
+    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, PriorityMarkerComponent, TimeBlockComponent, TranslatePipe,
   ],
   templateUrl: './task-list.component.html',
   styleUrl: './task-list.component.scss',
@@ -210,10 +209,11 @@ export class TaskListComponent {
     return this.busy().has(id);
   }
 
-  /** The circle: finish an open task, or re-open a finished one. */
-  protected toggleDone(task: Task, event?: Event): void {
-    const completing = task.status !== 'Completed';
-    this.setTaskStatus(task, completing ? 'Completed' : 'Todo', completing ? this.centerOf(event) : undefined);
+  /** One of the three status buttons; pressing the current status does nothing. */
+  protected chooseStatus(task: Task, status: TaskStatus, event?: Event): void {
+    if (task.status !== status) {
+      this.setTaskStatus(task, status, status === 'Completed' ? this.centerOf(event) : undefined);
+    }
   }
 
   protected setTaskStatus(task: Task, status: TaskStatus, celebrateAt?: { x: number; y: number }): void {

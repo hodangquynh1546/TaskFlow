@@ -20,6 +20,7 @@ import { StatusIndicatorComponent } from '../../shared/ui/status-indicator.compo
 import { givenName } from '../../shared/util/names';
 import { relativeTime } from '../../shared/util/relative-time';
 import { DashboardService } from './dashboard.service';
+import { ReportComponent } from './report/report.component';
 
 interface DashboardData {
   summary: DashboardSummary;
@@ -58,7 +59,7 @@ export function moodFor(summary: DashboardSummary): MascotMood {
 @Component({
   selector: 'tf-dashboard',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DueLabelComponent, EmptyStateComponent, ErrorStateComponent, ProgressStripComponent, StatusIndicatorComponent, CountComponent, MascotComponent, TranslatePipe],
+  imports: [RouterLink, DueLabelComponent, EmptyStateComponent, ErrorStateComponent, ProgressStripComponent, StatusIndicatorComponent, CountComponent, MascotComponent, ReportComponent, TranslatePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })

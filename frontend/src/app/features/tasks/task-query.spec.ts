@@ -75,8 +75,8 @@ describe('toQueryParams', () => {
   });
 
   it('includes only what differs', () => {
-    expect(toQueryParams({ ...DEFAULT_QUERY, status: 'Todo', page: 2, sortDir: 'asc', overdue: true })).toEqual({
-      search: null, status: 'Todo', priority: null, dueFrom: null, dueTo: null, overdue: 'true', sortBy: null, sortDir: 'asc', page: '2', pageSize: null,
+    expect(toQueryParams({ ...DEFAULT_QUERY, status: 'Todo', page: 2, sortDir: 'desc', overdue: true })).toEqual({
+      search: null, status: 'Todo', priority: null, dueFrom: null, dueTo: null, overdue: 'true', sortBy: null, sortDir: 'desc', page: '2', pageSize: null,
     });
   });
 

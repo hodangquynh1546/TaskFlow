@@ -5,7 +5,7 @@ import { TASK_PRIORITIES, TASK_STATUSES, TaskPriority, TaskStatus } from '../../
 export type TaskSortField = 'createdAt' | 'dueDate' | 'priority' | 'startDate';
 export type SortDirection = 'asc' | 'desc';
 
-export const SORT_FIELDS: readonly TaskSortField[] = ['createdAt', 'dueDate', 'startDate', 'priority'];
+export const SORT_FIELDS: readonly TaskSortField[] = ['startDate', 'dueDate', 'createdAt', 'priority'];
 export const PAGE_SIZES: readonly number[] = [10, 20, 50];
 
 /**
@@ -32,8 +32,8 @@ export const DEFAULT_QUERY: TaskListQuery = {
   dueFrom: null,
   dueTo: null,
   overdue: false,
-  sortBy: 'createdAt',
-  sortDir: 'desc',
+  sortBy: 'startDate',
+  sortDir: 'asc',
   page: 1,
   pageSize: 10,
 };

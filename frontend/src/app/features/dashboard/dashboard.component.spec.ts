@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { provideNzIconsTesting } from 'ng-zorro-antd/icon/testing';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiError } from '../../core/http/api-error';
@@ -22,6 +22,7 @@ function setup(overrides: Partial<Record<'summary' | 'upcoming' | 'recent', unkn
     summary: vi.fn().mockReturnValue(overrides.summary ?? of(summary())),
     upcoming: vi.fn().mockReturnValue(overrides.upcoming ?? of([])),
     recent: vi.fn().mockReturnValue(overrides.recent ?? of([])),
+    report: vi.fn().mockReturnValue(NEVER),
   };
   TestBed.configureTestingModule({
     providers: [

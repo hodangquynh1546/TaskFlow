@@ -14,6 +14,14 @@ describe('detectLanguage', () => {
     expect(detectLanguage(null, ['de'])).toBe('en');
   });
 
+  it('follows the first supported browser language, including Japanese and Chinese', () => {
+    expect(detectLanguage(null, ['ja-JP', 'en'])).toBe('ja');
+    expect(detectLanguage(null, ['fr', 'zh-CN', 'en'])).toBe('zh');
+    expect(detectLanguage(null, ['zh-TW'])).toBe('zh');
+    expect(detectLanguage('ja', ['vi'])).toBe('ja');
+    expect(detectLanguage('zh', ['en'])).toBe('zh');
+  });
+
   it('ignores a corrupted stored value and an absent browser list', () => {
     expect(detectLanguage('klingon', ['vi'])).toBe('vi');
     expect(detectLanguage(null, [])).toBe('vi');

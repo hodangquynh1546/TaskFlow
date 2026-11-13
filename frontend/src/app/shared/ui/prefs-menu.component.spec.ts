@@ -27,14 +27,14 @@ describe('PrefsMenuComponent', () => {
     expect(trigger.textContent).toContain('VI');
   });
 
-  it('opens a panel with three appearance choices and two languages, marking the current ones', () => {
+  it('opens a panel with three appearance choices and four languages, marking the current ones', () => {
     const { el, open } = setup();
     open();
 
     const groups = [...el.querySelectorAll('.choices')].map((g) => [...g.querySelectorAll('button')].map((b) => [b.textContent!.trim(), b.getAttribute('aria-pressed')]));
     expect(groups).toEqual([
       [['Sáng', 'false'], ['Tối', 'false'], ['Theo hệ thống', 'true']],
-      [['Tiếng Việt', 'true'], ['English', 'false']],
+      [['Tiếng Việt', 'true'], ['English', 'false'], ['日本語', 'false'], ['简体中文', 'false']],
     ]);
   });
 
@@ -60,6 +60,20 @@ describe('PrefsMenuComponent', () => {
     expect(el.querySelector('button.trigger')!.textContent).toContain('EN');
     expect(el.querySelector('.panel__title')!.textContent).toBe('Appearance');
     expect(el.querySelector('button.trigger')!.getAttribute('aria-label')).toBe('Appearance and language options');
+    i18n.setLang('vi');
+  });
+
+  it.each([['日本語', 'ja', 'JA', '外観'], ['简体中文', 'zh', 'ZH', '外观']])('switches to %s', (label, code, short, title) => {
+    const { el, open, i18n, fixture } = setup();
+    open();
+
+    [...el.querySelectorAll<HTMLButtonElement>('.choice')].find((b) => b.textContent!.trim() === label)!.click();
+    fixture.detectChanges();
+
+    expect(i18n.lang()).toBe(code);
+    expect(document.documentElement.lang).toBe(code);
+    expect(el.querySelector('button.trigger')!.textContent).toContain(short);
+    expect(el.querySelector('.panel__title')!.textContent).toBe(title);
     i18n.setLang('vi');
   });
 

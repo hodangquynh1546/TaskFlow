@@ -27,7 +27,7 @@ import { describeDue } from '../util/due';
     :host { display: inline-flex; }
     .due { display: inline-flex; align-items: center; gap: var(--tf-space-1); font-size: var(--tf-text-small); color: var(--tf-ink-soft); line-height: 1.2; }
     .due--overdue, .due--soon { padding: 2px 10px 2px 8px; border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-pill); color: var(--tf-ink); font-weight: 700; font-size: var(--tf-text-caption); }
-    .due--overdue { background: var(--tf-bubblegum); color: var(--tf-on-color); }
+    .due--overdue { background: var(--tf-alarm); border-color: var(--tf-alarm); color: #fff; }
     .due--soon { background: var(--tf-lemon-tint); }
   `,
 })

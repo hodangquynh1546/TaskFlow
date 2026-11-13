@@ -28,7 +28,7 @@ public sealed partial class MessageCompletenessTests
             .SelectMany(project => Directory.EnumerateFiles(Path.Combine(BackendRoot, "src", project), "*.cs", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
                      && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                     && !f.EndsWith("ProblemMessages.cs", StringComparison.Ordinal)
+                     && !Path.GetFileName(f).StartsWith("ProblemMessages", StringComparison.Ordinal)
                      && !f.EndsWith($"{Path.DirectorySeparatorChar}Program.cs", StringComparison.Ordinal)); // Swagger help text, not a response
 
         foreach (var file in files)
@@ -60,11 +60,15 @@ public sealed partial class MessageCompletenessTests
     }
 
     [Fact]
-    public void Every_vietnamese_message_in_the_backend_has_an_english_translation()
+    public void Every_vietnamese_message_in_the_backend_has_a_translation_in_every_other_language()
     {
-        var missing = Messages().Where(m => ProblemMessages.TryTranslate(m.Message) is null).Select(m => $"{m.File}: {m.Message}").Distinct().ToList();
+        var missing = Messages()
+            .SelectMany(m => new[] { ResponseLanguage.English, ResponseLanguage.Japanese, ResponseLanguage.Chinese }
+                .Where(language => ProblemMessages.TryTranslate(m.Message, language) is null)
+                .Select(language => $"{language} - {m.File}: {m.Message}"))
+            .Distinct().ToList();
 
-        Assert.True(missing.Count == 0, "No English translation in ProblemMessages for:\n" + string.Join("\n", missing));
+        Assert.True(missing.Count == 0, "No translation in ProblemMessages for:\n" + string.Join("\n", missing));
     }
 
     private static string FindBackendRoot()

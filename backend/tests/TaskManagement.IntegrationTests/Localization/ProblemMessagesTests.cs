@@ -28,6 +28,11 @@ public sealed class ProblemMessagesTests
     [InlineData("*", ResponseLanguage.Vietnamese)]
     [InlineData("en;q=0, vi", ResponseLanguage.Vietnamese)]
     [InlineData("not a language header ;;", ResponseLanguage.Vietnamese)]
+    [InlineData("ja", ResponseLanguage.Japanese)]
+    [InlineData("ja-JP,ja;q=0.9,en;q=0.5", ResponseLanguage.Japanese)]
+    [InlineData("zh-CN,zh;q=0.9", ResponseLanguage.Chinese)]
+    [InlineData("zh-TW", ResponseLanguage.Chinese)]
+    [InlineData("en;q=0.4, ja;q=0.8", ResponseLanguage.Japanese)]
     public void Accept_Language_picks_the_best_supported_language_and_defaults_to_the_source_language(string? header, ResponseLanguage expected)
     {
         Assert.Equal(expected, Resolve(header));
@@ -42,6 +47,26 @@ public sealed class ProblemMessagesTests
     public void Known_messages_are_translated_including_the_numbers_they_carry(string vietnamese, string english)
     {
         Assert.Equal(english, ProblemMessages.Translate(vietnamese, ResponseLanguage.English));
+    }
+
+    [Theory]
+    [InlineData(ResponseLanguage.Japanese, "メールアドレスまたはパスワードが正しくありません。", "パスワードは8文字以上で入力してください。", "所要時間は1〜1440分にしてください。")]
+    [InlineData(ResponseLanguage.Chinese, "邮箱或密码不正确。", "密码至少需要 8 个字符。", "时长必须为 1 到 1440 分钟。")]
+    public void Japanese_and_Chinese_translate_exact_messages_and_the_numbers_in_them(ResponseLanguage language, string exact, string withNumber, string minutes)
+    {
+        Assert.Equal(exact, ProblemMessages.Translate("Email hoặc mật khẩu không đúng.", language));
+        Assert.Equal(withNumber, ProblemMessages.Translate("Mật khẩu phải có ít nhất 8 ký tự.", language));
+        Assert.Equal(minutes, ProblemMessages.Translate("Thời lượng phải từ 1 đến 1440 phút.", language));
+    }
+
+    [Theory]
+    [InlineData(ResponseLanguage.Japanese, 404, "見つかりません")]
+    [InlineData(ResponseLanguage.Chinese, 404, "未找到")]
+    [InlineData(ResponseLanguage.Japanese, 418, "リクエストに失敗しました")]
+    [InlineData(ResponseLanguage.Chinese, 418, "请求失败")]
+    public void Titles_exist_in_Japanese_and_Chinese(ResponseLanguage language, int status, string expected)
+    {
+        Assert.Equal(expected, ProblemMessages.TitleFor(status, "Không tìm thấy", language));
     }
 
     [Fact]

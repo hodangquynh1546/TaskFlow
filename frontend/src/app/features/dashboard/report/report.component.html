@@ -1,0 +1,74 @@
+<section class="report tf-panel" aria-labelledby="report-title">
+  <header class="report__head">
+    <h2 id="report-title" class="report__title">{{ 'report.title' | t }}</h2>
+
+    <div class="report__controls">
+      <div class="seg" role="group" [attr.aria-label]="'report.periodAria' | t">
+        @for (option of periods; track option) {
+          <button type="button" class="seg__btn" [attr.aria-pressed]="period() === option" (click)="choose(option)">
+            {{ periodKeys[option] | t }}
+          </button>
+        }
+      </div>
+
+      <div class="stepper">
+        <button type="button" nz-button class="stepper__btn" [attr.aria-label]="'report.prev' | t" (click)="step(-1)">
+          <span nz-icon nzType="left" nzTheme="outline" aria-hidden="true"></span>
+        </button>
+        <span class="stepper__range" aria-live="polite">{{ rangeText() }}</span>
+        <button type="button" nz-button class="stepper__btn" [attr.aria-label]="'report.next' | t" [disabled]="back() === 0" (click)="step(1)">
+          <span nz-icon nzType="right" nzTheme="outline" aria-hidden="true"></span>
+        </button>
+        <button type="button" nz-button [disabled]="back() === 0" (click)="back.set(0)">{{ 'report.current' | t }}</button>
+      </div>
+    </div>
+  </header>
+
+  @if (error(); as failure) {
+    <tf-error-state [message]="failure.message || ('report.loadError' | t)" (retry)="retry()" />
+  } @else if (data(); as report) {
+    <div class="report__body" [class.report__body--busy]="loading()" [attr.aria-busy]="loading()">
+      <ul class="tiles">
+        @for (tile of tiles(); track tile.key) {
+          <li class="tile">
+            <span class="tile__value">{{ tile.value }}</span>
+            <span class="tile__label">{{ tile.key | t }}</span>
+          </li>
+        }
+      </ul>
+
+      @if (hasWork()) {
+        <div class="charts">
+          <figure class="chart">
+            <figcaption>{{ 'report.hoursTitle' | t }}</figcaption>
+            <tf-bar-chart [values]="hoursChart().values" [labels]="hoursChart().labels" [titles]="hoursChart().titles"
+                          [max]="hoursChart().max" [ticks]="hoursChart().ticks" style="--chart-color: var(--tf-tangerine)" />
+          </figure>
+          <figure class="chart">
+            <figcaption>{{ 'report.tasksTitle' | t }}</figcaption>
+            <tf-bar-chart [values]="tasksChart().values" [labels]="tasksChart().labels" [titles]="tasksChart().titles"
+                          [max]="tasksChart().max" [ticks]="tasksChart().ticks" style="--chart-color: var(--tf-mint)" />
+          </figure>
+        </div>
+
+        <table class="tf-visually-hidden">
+          <caption>{{ 'report.tableAria' | t }}, {{ rangeText() }}</caption>
+          <thead>
+            <tr><th scope="col">{{ 'report.col.period' | t }}</th><th scope="col">{{ 'report.col.hours' | t }}</th><th scope="col">{{ 'report.col.tasks' | t }}</th></tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.full) {
+              <tr><th scope="row">{{ row.full }}</th><td>{{ duration(row.minutes) }}</td><td>{{ row.tasks }}</td></tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="empty">{{ 'report.empty' | t }}</p>
+      }
+
+      <p class="hint">{{ 'report.hint' | t }}</p>
+    </div>
+  } @else {
+    <div class="tf-skeleton sk" role="status" aria-busy="true"><span class="tf-visually-hidden">{{ 'report.loading' | t }}</span></div>
+  }
+</section>
