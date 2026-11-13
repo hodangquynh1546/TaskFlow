@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, viewChild } from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMenuModule } from 'ng-zorro-antd/menu';
@@ -25,6 +25,27 @@ export class ShellComponent {
 
   protected readonly user = this.auth.user;
   protected readonly initials = computed(() => initialsOf(this.user()?.fullName));
+
+  private readonly main = viewChild<ElementRef<HTMLElement>>('main');
+
+  constructor() {
+    // The content scrolls inside the shell, so (unlike a page) it would keep its scroll position when another screen
+    // opens. A different screen starts at the top; a change of query on the same screen leaves the scroll alone.
+    let path = '';
+    const subscription = inject(Router).events.subscribe((event) => {
+      if (event instanceof NavigationEnd) {
+        const next = event.urlAfterRedirects.split(/[?#]/)[0];
+        if (next !== path) {
+          path = next;
+          const main = this.main()?.nativeElement;
+          if (main) {
+            main.scrollTop = 0;
+          }
+        }
+      }
+    });
+    inject(DestroyRef).onDestroy(() => subscription.unsubscribe());
+  }
 
   protected signOut(): void {
     this.auth.signOut();

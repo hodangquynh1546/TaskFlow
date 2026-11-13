@@ -6,7 +6,7 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { provideNzI18n, vi_VN } from 'ng-zorro-antd/i18n';
 import { provideNzIconsTesting } from 'ng-zorro-antd/icon/testing';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/http/api-error';
 import { NotifyService } from '../../../core/notify/notify.service';
@@ -26,8 +26,14 @@ const page = (items: Task[], patch: Partial<PagedResult<Task>> = {}): PagedResul
   items, page: 1, pageSize: 10, totalCount: items.length, totalPages: Math.max(1, Math.ceil(items.length / 10)), ...patch,
 });
 
-async function setup(url = '/tasks', first: unknown = of(page([task({ id: 'a', title: 'Việc A' }), task({ id: 'b', title: 'Việc B', status: 'Completed' })]))) {
-  const service = { list: vi.fn().mockReturnValue(first), changeStatus: vi.fn(), delete: vi.fn() };
+async function setup(
+  url = '/tasks',
+  first: unknown = of(page([task({ id: 'a', title: 'Việc A' }), task({ id: 'b', title: 'Việc B', status: 'Completed' })])),
+  position: unknown = NEVER,
+) {
+  // `first` is what every list call returns, or a function that answers each call by its query.
+  const list = typeof first === 'function' ? vi.fn().mockImplementation(first as (q: unknown) => unknown) : vi.fn().mockReturnValue(first);
+  const service = { list, changeStatus: vi.fn(), delete: vi.fn(), position: vi.fn().mockReturnValue(position) };
   const notify = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const confirm = { confirmDelete: vi.fn().mockResolvedValue(true) };
   TestBed.configureTestingModule({
@@ -88,7 +94,7 @@ describe('TaskListComponent', () => {
       const row = el.querySelector('.row')!;
 
       expect(row.querySelector('.row__description')!.textContent).toBe('Báo cáo quý 4');
-      expect(row.querySelector('tf-priority')).not.toBeNull();
+      expect(row.querySelector('tf-priority')).toBeNull(); // the list no longer shows the priority marker
       expect(row.querySelector('.seg__btn--Completed')!.getAttribute('aria-pressed')).toBe('true');
       expect(row.querySelector('tf-due')).not.toBeNull();
       expect(row.classList.contains('row--done')).toBe(true);
@@ -402,6 +408,62 @@ describe('TaskListComponent', () => {
 
       const flags = [...el.querySelectorAll('.row')].map((r) => r.classList.contains('row--overdue'));
       expect(flags).toEqual([true, false, false]);
+    });
+  });
+
+  describe('bringing a new task into view', () => {
+    const items = (...ids: string[]) => of(page(ids.map((id) => task({ id, title: `Việc ${id}` }))));
+
+    it('lights up the row of a task on the current page and drops the request from the address', async () => {
+      const { el, service, router, settle } = await setup('/tasks?highlight=b', items('a', 'b'));
+      await vi.waitFor(() => expect(router.url).toBe('/tasks'));
+      await settle();
+
+      expect(service.position).not.toHaveBeenCalled();
+      expect(el.querySelector('#task-b')!.classList.contains('row--flash')).toBe(true);
+      expect(el.querySelector('#task-a')!.classList.contains('row--flash')).toBe(false);
+    });
+
+    it('does not reload the list just because the highlight was removed from the address', async () => {
+      const { service, router, settle } = await setup('/tasks?highlight=b', items('a', 'b'));
+
+      await vi.waitFor(() => expect(router.url).toBe('/tasks'));
+      await settle();
+
+      expect(service.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('for a task on another page, asks where it is and opens that page', async () => {
+      const byPage = (q: { page: number }) => (q.page === 3 ? items('z', 'far') : items('a'));
+      const { el, service, router, lastQuery } = await setup('/tasks?highlight=far', byPage, of({ page: 3, index: 24 }));
+
+      await vi.waitFor(() => expect(lastQuery().page).toBe(3));
+
+      expect(service.position.mock.calls[0][0]).toBe('far');
+      await vi.waitFor(() => expect(el.querySelector('#task-far')?.classList.contains('row--flash')).toBe(true));
+      await vi.waitFor(() => expect(router.url).toBe('/tasks?page=3'));
+    });
+
+    it('when the filters hide the saved task, keeps the filters and says why it is not on screen', async () => {
+      const failing = throwError(() => new ApiError(404, 'x'));
+      const { service, notify, router, settle } = await setup('/tasks?status=InProgress&highlight=gone', items('a'), failing);
+
+      await vi.waitFor(() => expect(notify.info).toHaveBeenCalledWith('Công việc đã lưu không khớp bộ lọc đang dùng nên không hiện trong danh sách.'));
+      await settle();
+
+      expect(router.url).toBe('/tasks?status=InProgress');
+      expect(service.position).toHaveBeenCalledTimes(1);
+      expect(service.list.mock.calls.every(([q]) => q.status === 'InProgress')).toBe(true);
+    });
+
+    it('gives up quietly when the task cannot be found at all, without looping', async () => {
+      const { service, notify, router, settle } = await setup('/tasks?highlight=ghost', items('a'), throwError(() => new ApiError(404, 'x')));
+
+      await vi.waitFor(() => expect(router.url).toBe('/tasks'));
+      await settle();
+
+      expect(service.position).toHaveBeenCalledTimes(1);
+      expect(notify.info).not.toHaveBeenCalled(); // no filters were hiding anything: nothing to explain
     });
   });
 

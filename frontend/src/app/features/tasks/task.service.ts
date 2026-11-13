@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 import { API_BASE_URL } from '../../core/config/api.config';
 import { PagedResult, Task, TaskPayload, TaskStatus } from '../../shared/models/task.models';
@@ -13,38 +13,55 @@ export function dayBoundary(day: string, edge: 'start' | 'end'): string {
   return date.toISOString();
 }
 
+export interface TaskPosition {
+  page: number;
+  index: number;
+}
+
+/** The server-side form of a list query: the same filters and sort whether listing or asking where a task sits. */
+function listParams(query: TaskListQuery): HttpParams {
+  let params = new HttpParams().set('sortBy', query.sortBy).set('sortDir', query.sortDir).set('page', query.page).set('pageSize', query.pageSize);
+
+  const search = query.search.trim();
+  if (search) {
+    params = params.set('search', search);
+  }
+  if (query.status) {
+    params = params.set('status', query.status);
+  }
+  if (query.priority) {
+    params = params.set('priority', query.priority);
+  }
+  if (query.dueFrom) {
+    params = params.set('dueFrom', dayBoundary(query.dueFrom, 'start'));
+  }
+  if (query.dueTo) {
+    params = params.set('dueTo', dayBoundary(query.dueTo, 'end'));
+  }
+  if (query.overdue) {
+    params = params.set('overdue', true);
+  }
+  return params;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TaskService {
   private readonly http = inject(HttpClient);
   private readonly url = `${inject(API_BASE_URL)}/tasks`;
 
   list(query: TaskListQuery): Observable<PagedResult<Task>> {
-    let params = new HttpParams()
-      .set('sortBy', query.sortBy)
-      .set('sortDir', query.sortDir)
-      .set('page', query.page)
-      .set('pageSize', query.pageSize);
+    return this.http.get<PagedResult<Task>>(this.url, { params: listParams(query) });
+  }
 
-    const search = query.search.trim();
-    if (search) {
-      params = params.set('search', search);
-    }
-    if (query.status) {
-      params = params.set('status', query.status);
-    }
-    if (query.priority) {
-      params = params.set('priority', query.priority);
-    }
-    if (query.dueFrom) {
-      params = params.set('dueFrom', dayBoundary(query.dueFrom, 'start'));
-    }
-    if (query.dueTo) {
-      params = params.set('dueTo', dayBoundary(query.dueTo, 'end'));
-    }
-    if (query.overdue) {
-      params = params.set('overdue', true);
-    }
-    return this.http.get<PagedResult<Task>>(this.url, { params });
+  /** Where a task sits in the list for this filter and sort: the page it is on (for the query's page size) and its index. 404 when the filters hide it. */
+  position(id: string, query: TaskListQuery): Observable<TaskPosition> {
+    return this.http.get<TaskPosition>(`${this.url}/${id}/position`, { params: listParams(query) });
+  }
+
+  /** Titles used before that start with the typed text, for the title box to offer; empty text offers nothing. */
+  suggestTitles(prefix: string): Observable<string[]> {
+    const text = prefix.trim();
+    return text ? this.http.get<string[]>(`${this.url}/title-suggestions`, { params: new HttpParams().set('prefix', text).set('limit', 8) }) : of([]);
   }
 
   /** The tasks that start on one local day ("yyyy-MM-dd"), earliest first. At most 50: more than that is not a day anyone plans. */

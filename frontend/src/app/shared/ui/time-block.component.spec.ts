@@ -33,6 +33,23 @@ describe('TimeBlockComponent', () => {
     expect(el.textContent).toContain('45 phút');
   });
 
+  it.each([['Todo'], ['InProgress'], ['Completed']] as const)('colours the time slot like the %s status when it is given one', (status) => {
+    const fixture = TestBed.createComponent(TimeBlockComponent);
+    fixture.componentRef.setInput('task', { startDate: start(9), durationMinutes: 60 });
+    fixture.componentRef.setInput('status', status);
+    fixture.detectChanges();
+
+    const when = (fixture.nativeElement as HTMLElement).querySelector('.block__when')!;
+    expect(when.classList.contains(`block__when--${status}`)).toBe(true);
+    expect(when.textContent).toContain('09:00–10:00');
+  });
+
+  it('without a status the slot stays plain', () => {
+    const el = render(start(9), 60);
+
+    expect(el.querySelector('.block__when')!.className).toBe('block__when');
+  });
+
   it('renders nothing for a task with no planning', () => {
     expect(render(null, null).querySelector('.block')).toBeNull();
   });

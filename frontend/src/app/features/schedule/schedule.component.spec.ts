@@ -37,6 +37,22 @@ async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(page
   return { harness, service, el, router: TestBed.inject(Router), settle, text: () => el.textContent ?? '' };
 }
 
+async function setupWithComponent(url: string, scheduled: unknown = of(paged([])), due: unknown = of(paged([]))) {
+  const service = { forDay: vi.fn().mockReturnValue(scheduled), dueOn: vi.fn().mockReturnValue(due) };
+  TestBed.configureTestingModule({
+    providers: [
+      ...UI_TEST_PROVIDERS,
+      provideRouter([{ path: 'schedule', component: ScheduleComponent }], withComponentInputBinding()),
+      { provide: TaskService, useValue: service },
+    ],
+  });
+  const harness = await RouterTestingHarness.create();
+  const component = await harness.navigateByUrl(url, ScheduleComponent);
+  await harness.fixture.whenStable();
+  harness.detectChanges();
+  return { harness: Object.assign(harness, { component }) };
+}
+
 const blocks = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('a.block')];
 
 describe('ScheduleComponent', () => {
@@ -334,6 +350,101 @@ describe('ScheduleComponent', () => {
       await settle();
 
       expect(blocks(el).map((b) => b.getAttribute('href'))).toEqual(['/tasks/new']);
+    });
+  });
+
+  describe('where the timeline opens', () => {
+    // 06:00 is the first line, 84 px per hour, 16 px of margin above it and 14 px for the label that sticks out.
+    const opensAt = (hour: number) => 16 + (hour - 6) * 84 - 14;
+
+    it('today: the current hour is the first line, so nothing needs scrolling up to', async () => {
+      vi.setSystemTime(new Date(2026, 10, 20, 13, 20));
+      const { harness } = await setupWithComponent('/schedule?date=2026-11-20');
+
+      expect(harness.component['focusTop']()).toBe(opensAt(13));
+    });
+
+    it('today before the first drawn hour opens at the top, and after the last at the bottom of the day', async () => {
+      vi.setSystemTime(new Date(2026, 10, 20, 3, 0));
+      const early = await setupWithComponent('/schedule?date=2026-11-20');
+      expect(early.harness.component['focusTop']()).toBe(0);
+
+      TestBed.resetTestingModule();
+      vi.setSystemTime(new Date(2026, 10, 20, 23, 30));
+      const late = await setupWithComponent('/schedule?date=2026-11-20');
+      expect(late.harness.component['focusTop']()).toBe(late.harness.component['gridHeight']());
+    });
+
+    it('another day opens an hour before its first task', async () => {
+      const { harness } = await setupWithComponent('/schedule?date=2026-11-12', of(paged([block('a', 10, 0, 60)])));
+
+      expect(harness.component['focusTop']()).toBe(16 + (4 * 60 - 60) * PX_PER_MINUTE);
+    });
+
+    it('the clock ticking over does not move the timeline under the user', async () => {
+      vi.setSystemTime(new Date(2026, 10, 20, 13, 20));
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval'] });
+      vi.setSystemTime(new Date(2026, 10, 20, 13, 20));
+      const { harness } = await setupWithComponent('/schedule?date=2026-11-20');
+      const scroller = harness.routeNativeElement!.querySelector<HTMLElement>('.board__scroll')!;
+      scroller.scrollTop = 40;
+
+      vi.setSystemTime(new Date(2026, 10, 20, 14, 5));
+      vi.advanceTimersByTime(60_000);
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+
+      expect(scroller.scrollTop).toBe(40);
+    });
+  });
+
+  describe('pointing at a just-saved task', () => {
+    const busyDay = () => of(paged([block('a', 8, 0, 60), block('b', 15, 0, 60), block('c', 20, 0, 30)]));
+
+    it('lights up that task\'s block and removes the request from the address', async () => {
+      const { el, router, settle } = await setup(`/schedule?date=${DAY}&highlight=b`, busyDay());
+      await vi.waitFor(() => expect(router.url).toBe(`/schedule?date=${DAY}`));
+      await settle();
+
+      const lit = blocks(el).filter((b) => b.classList.contains('block--flash'));
+      expect(lit).toHaveLength(1);
+      expect(lit[0].textContent).toContain('Việc b');
+    });
+
+    it('does not reload the day just because the request was removed', async () => {
+      const { service, router, settle } = await setup(`/schedule?date=${DAY}&highlight=b`, busyDay());
+
+      await vi.waitFor(() => expect(router.url).toBe(`/schedule?date=${DAY}`));
+      await settle();
+
+      expect(service.forDay).toHaveBeenCalledTimes(1);
+    });
+
+    it('a task that is not on this day lights nothing, and the request is still removed', async () => {
+      const { el, router, settle } = await setup(`/schedule?date=${DAY}&highlight=elsewhere`, busyDay());
+
+      await vi.waitFor(() => expect(router.url).toBe(`/schedule?date=${DAY}`));
+      await settle();
+
+      expect(blocks(el).some((b) => b.classList.contains('block--flash'))).toBe(false);
+    });
+
+    it('scrolls the block to the middle of the visible part instead of the usual opening position', async () => {
+      // jsdom does no layout, so the viewport height is stated and every scroll the planner asks for is recorded.
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+      const scrolls: number[] = [];
+      Object.defineProperty(HTMLElement.prototype, 'scrollTop', { configurable: true, get: () => 0, set: (value: number) => scrolls.push(value) });
+
+      try {
+        await setup(`/schedule?date=${DAY}&highlight=c`, busyDay());
+        await vi.waitFor(() => expect(scrolls.length).toBeGreaterThan(0));
+
+        // 20:00 is 14 hours after the axis starts at 06:00; the block is 30 minutes, so its middle is 15 minutes in.
+        const middle = 16 + (14 * 60 + 15) * PX_PER_MINUTE;
+        expect(scrolls.at(-1)).toBeCloseTo(middle - 200, 5);
+      } finally {
+        delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;
+      }
     });
   });
 });

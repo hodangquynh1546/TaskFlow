@@ -6,10 +6,12 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { ApiError } from '../../../core/http/api-error';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
+import { BrowseMemory } from '../../../core/navigation/browse-memory';
 import { NotifyService } from '../../../core/notify/notify.service';
 import { TaskPayload } from '../../../shared/models/task.models';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
 import { TaskMissingComponent } from '../../../shared/ui/task-missing.component';
+import { whereAfterSave } from '../create/previous-page';
 import { TaskFormComponent } from '../form/task-form.component';
 import { createTaskResource } from '../task-resource';
 import { TaskService } from '../task.service';
@@ -25,13 +27,19 @@ import { TaskService } from '../task.service';
         <tf-error-state [message]="resource.error()?.message ?? ('detail.loadError' | t)" (retry)="resource.reload()" />
       }
       @default {
-        <a class="tf-back" [routerLink]="['/tasks', id()]"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ 'detail.backToTask' | t }}</a>
-        <header class="tf-page-header"><h1>{{ 'title.taskEdit' | t }}</h1></header>
-        @if (resource.state() === 'loading') {
-          <div class="skeleton tf-skeleton" role="status" aria-busy="true"><span class="tf-visually-hidden">{{ 'detail.loading' | t }}</span></div>
-        } @else {
-          <tf-task-form [submitLabel]="'common.save' | t" [task]="resource.task()" [saving]="saving()" (save)="save($event)" (cancelled)="cancel()" />
-        }
+        <div class="tf-form-page">
+          <div class="tf-form-page__head">
+            <a class="tf-back" [routerLink]="['/tasks', id()]"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ 'detail.backToTask' | t }}</a>
+            <header class="tf-page-header"><h1>{{ 'title.taskEdit' | t }}</h1></header>
+          </div>
+          <div class="tf-form-page__body">
+            @if (resource.state() === 'loading') {
+              <div class="skeleton tf-skeleton" role="status" aria-busy="true"><span class="tf-visually-hidden">{{ 'detail.loading' | t }}</span></div>
+            } @else {
+              <tf-task-form [submitLabel]="'common.save' | t" [task]="resource.task()" [saving]="saving()" [suggest]="suggestTitles" (save)="save($event)" (cancelled)="cancel()" />
+            }
+          </div>
+        </div>
       }
     }
   `,
@@ -44,6 +52,10 @@ export class TaskEditComponent {
   private readonly router = inject(Router);
   private readonly notify = inject(NotifyService);
   private readonly i18n = inject(I18nService);
+  private readonly memory = inject(BrowseMemory);
+
+  /** Captured while the router is still navigating here: after saving, the list the user came from is shown again. */
+  private readonly previousUrl = this.router.currentNavigation()?.previousNavigation?.finalUrl?.toString();
 
   /** Bound from the route parameter by the router. */
   readonly id = input.required<string>();
@@ -51,6 +63,7 @@ export class TaskEditComponent {
   protected readonly resource = createTaskResource(this.id, this.tasks, inject(DestroyRef));
   private readonly form = viewChild(TaskFormComponent);
   protected readonly saving = signal(false);
+  protected readonly suggestTitles = (prefix: string) => this.tasks.suggestTitles(prefix);
 
   protected save(payload: TaskPayload): void {
     if (this.saving()) {
@@ -58,9 +71,10 @@ export class TaskEditComponent {
     }
     this.saving.set(true);
     this.tasks.update(this.id(), payload).subscribe({
-      next: () => {
+      next: (task) => {
         this.notify.success(this.i18n.t('toast.saved'));
-        void this.router.navigate(['/tasks', this.id()]);
+        // Editing can move a task to another place in the list (a new start time, a new status), so it is looked up again.
+        void this.router.navigateByUrl(whereAfterSave(this.previousUrl, this.memory.last(), task), { replaceUrl: true });
       },
       error: (error: ApiError) => {
         this.saving.set(false);

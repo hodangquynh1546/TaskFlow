@@ -8,7 +8,7 @@
 
 .board { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--tf-space-8); align-items: start; }
 .board__panel { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
-.board__scroll { max-height: 70vh; overflow-y: auto; }
+.board__scroll { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
 
 .timeline { position: relative; margin: 16px var(--tf-space-4) 16px 4rem; } // room above the first hour so its label is not clipped
 
@@ -36,6 +36,12 @@
 .block--short { flex-direction: row; align-items: center; gap: var(--tf-space-2); padding-block: 0; }
 .block--high::after { content: ''; position: absolute; top: -2px; right: -2px; width: 14px; height: 14px; background: var(--tf-bubblegum); border: 2px solid var(--tf-edge); border-radius: 0 var(--tf-radius-control) 0 8px; }
 .block--estimated { border-style: dashed; }
+// Two soft pulses on the block of the task that was just saved, so the eye finds it after the scroll.
+.block--flash { animation: block-flash 1.1s ease-in-out 2; }
+@keyframes block-flash {
+  0%, 100% { outline: 4px solid transparent; outline-offset: 3px; }
+  50% { outline: 4px solid var(--tf-tangerine); outline-offset: 3px; }
+}
 .block__title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .block__time { font-size: var(--tf-text-caption); font-weight: 500; font-variant-numeric: tabular-nums; opacity: 0.85; }
 

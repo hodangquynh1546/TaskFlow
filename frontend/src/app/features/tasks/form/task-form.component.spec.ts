@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 
 import { ApiError } from '../../../core/http/api-error';
 import { Task } from '../../../shared/models/task.models';
 import { UI_TEST_PROVIDERS, aTask } from '../test-support';
 import { TaskFormComponent } from './task-form.component';
 
-function setup(inputs: { task?: Task | null; saving?: boolean } = {}) {
+function setup(inputs: { task?: Task | null; saving?: boolean; suggest?: ((prefix: string) => unknown) | null } = {}) {
   TestBed.configureTestingModule({ providers: UI_TEST_PROVIDERS });
   const fixture = TestBed.createComponent(TaskFormComponent);
   fixture.componentRef.setInput('submitLabel', 'Tạo công việc');
@@ -37,7 +38,7 @@ describe('TaskFormComponent', () => {
     const { form } = setup();
 
     expect(form.getRawValue()).toEqual({
-      title: '', description: '', priority: 'Medium', status: 'Todo', startDate: null, startTime: '', durationChoice: 'none', customMinutes: null, dueDate: null,
+      title: '', description: '', priority: 'Medium', status: 'Todo', startDate: null, startTime: '', durationChoice: 'none', customMinutes: null,
     });
   });
 
@@ -55,11 +56,11 @@ describe('TaskFormComponent', () => {
     expect(el.querySelector('label[nz-radio].ant-radio-wrapper-checked')!.textContent).toContain('Trung bình');
   });
 
-  it('asks for the due date as a day only: choosing it is complete, with no extra confirm step to forget', () => {
+  it('has no due date to fill in: it follows the start day and time', () => {
     const { el } = setup();
 
-    expect(el.querySelector('#dueDate')).not.toBeNull();
-    expect(el.querySelector('.ant-picker-ok')).toBeNull();
+    expect(el.querySelector('#dueDate')).toBeNull();
+    expect(el.textContent).not.toContain('Hạn hoàn thành');
   });
 
   describe('the Enter key', () => {
@@ -72,7 +73,6 @@ describe('TaskFormComponent', () => {
     it('in a date picker only accepts the typed date; it never submits the form (which would drop the date)', () => {
       const { el } = setup();
 
-      expect(press(el.querySelector('#dueDate')!).defaultPrevented).toBe(true);
       expect(press(el.querySelector('#startDate')!).defaultPrevented).toBe(true);
     });
 
@@ -135,45 +135,12 @@ describe('TaskFormComponent', () => {
       submit();
       expect(saved).toHaveBeenCalledTimes(1);
     });
-
-    it('rejects a due date before the start day, explaining it under the due date, and accepts it once fixed', () => {
-      const { submit, set, saved, text } = setup();
-      set({ title: 'Việc', startDate: new Date(2026, 10, 13), startTime: '09:00', dueDate: new Date(2026, 10, 12, 17, 0) });
-
-      submit();
-      expect(text()).toContain('Hạn hoàn thành không được trước giờ bắt đầu.');
-      expect(saved).not.toHaveBeenCalled();
-
-      set({ dueDate: new Date(2026, 10, 13, 17, 0) });
-      submit();
-      expect(saved).toHaveBeenCalledTimes(1);
-    });
-
-    it('accepts the same day for start and due', () => {
-      const { submit, set, saved } = setup();
-      set({ title: 'Việc', startDate: new Date(2026, 10, 12), dueDate: new Date(2026, 10, 12, 8, 0) });
-
-      submit();
-
-      expect(saved).toHaveBeenCalledTimes(1);
-    });
-
-    it('accepts either date on its own', () => {
-      const { submit, set, saved } = setup();
-      set({ title: 'Việc', startDate: new Date(2026, 10, 12) });
-      submit();
-      set({ startDate: null, dueDate: new Date(2020, 0, 1) }); // a past due date is allowed
-      submit();
-
-      expect(saved).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe('submitting', () => {
-    it('emits a trimmed, UTC-based payload with the due date at the end of its day', () => {
+    it('emits a trimmed, UTC-based payload, with no due date for the server to derive', () => {
       const { submit, set, saved } = setup();
-      const due = new Date(2026, 10, 20, 17, 30);
-      set({ title: '  Họp nhóm  ', description: '  chuẩn bị slide  ', priority: 'High', status: 'InProgress', startDate: new Date(2026, 10, 18), startTime: '14:00', durationChoice: '60', dueDate: due });
+      set({ title: '  Họp nhóm  ', description: '  chuẩn bị slide  ', priority: 'High', status: 'InProgress', startDate: new Date(2026, 10, 18), startTime: '14:00', durationChoice: '60' });
 
       submit();
 
@@ -183,7 +150,7 @@ describe('TaskFormComponent', () => {
         priority: 'High',
         status: 'InProgress',
         startDate: new Date(2026, 10, 18, 14, 0, 0, 0).toISOString(),
-        dueDate: new Date(2026, 10, 20, 23, 59, 0, 0).toISOString(),
+        dueDate: null,
         durationMinutes: 60,
       });
     });
@@ -214,9 +181,9 @@ describe('TaskFormComponent', () => {
   });
 
   describe('editing an existing task', () => {
-    it('saving without touching the due day keeps the task\'s own due time', () => {
+    it('saving a task that has a due date but no start keeps that due date', () => {
       const due = new Date(2026, 10, 20, 17, 30).toISOString();
-      const { submit, saved } = setup({ task: aTask({ dueDate: due }) });
+      const { submit, saved } = setup({ task: aTask({ startDate: null, dueDate: due }) });
 
       submit();
 
@@ -224,11 +191,9 @@ describe('TaskFormComponent', () => {
     });
 
     it('fills every field from the task', () => {
-      const due = '2026-11-20T10:00:00Z';
-      const { form } = setup({ task: aTask({ title: 'Cũ', description: null, status: 'InProgress', priority: 'High', startDate: '2026-11-18T00:00:00Z', dueDate: due }) });
+      const { form } = setup({ task: aTask({ title: 'Cũ', description: null, status: 'InProgress', priority: 'High', startDate: '2026-11-18T00:00:00Z', dueDate: '2026-11-20T10:00:00Z' }) });
 
       expect(form.getRawValue()).toMatchObject({ title: 'Cũ', description: '', status: 'InProgress', priority: 'High' });
-      expect(form.getRawValue().dueDate).toEqual(new Date(due));
     });
 
     it('reloads the form when a different task arrives', () => {
@@ -325,12 +290,12 @@ describe('TaskFormComponent', () => {
 
     it('says when the block ends once it knows the start and the length', () => {
       const { el, set, fixture } = setup();
-      expect(el.textContent).not.toContain('Kết thúc lúc');
+      expect(el.textContent).not.toContain('Kết thúc và đến hạn lúc');
 
       set({ startDate: new Date(2026, 10, 12), startTime: '09:00', durationChoice: '90' === '90' ? 'custom' : 'none', customMinutes: 90 });
       fixture.detectChanges();
 
-      expect(el.textContent).toContain('Kết thúc lúc 10:30');
+      expect(el.textContent).toContain('Kết thúc và đến hạn lúc 10:30');
     });
 
     it('shows the end for a quick choice too, and nothing without a start time or a length', () => {
@@ -338,11 +303,11 @@ describe('TaskFormComponent', () => {
 
       set({ startDate: new Date(2026, 10, 12), startTime: '14:15', durationChoice: '15' });
       fixture.detectChanges();
-      expect(el.textContent).toContain('Kết thúc lúc 14:30');
+      expect(el.textContent).toContain('Kết thúc và đến hạn lúc 14:30');
 
       set({ durationChoice: 'none' });
       fixture.detectChanges();
-      expect(el.textContent).not.toContain('Kết thúc lúc');
+      expect(el.textContent).not.toContain('Kết thúc và đến hạn lúc');
     });
 
     it('refuses a block that runs past midnight and says so under the length', () => {
@@ -455,6 +420,75 @@ describe('TaskFormComponent', () => {
       edit.fixture.componentRef.setInput('prefill', { date: '2026-11-12', time: '14:30' });
       edit.fixture.detectChanges();
       expect(edit.form.getRawValue().startTime).toBe('08:00');
+    });
+  });
+
+  describe('title suggestions', () => {
+    const type = (set: (patch: Record<string, unknown>) => void, form: { controls: { title: { markAsDirty(): void } } }, text: string) => {
+      form.controls.title.markAsDirty();
+      set({ title: text });
+    };
+
+    it('offers earlier titles that start with what was typed, after a short pause', async () => {
+      const lookup = vi.fn().mockReturnValue(of(['đã dạy', 'động', 'đen']));
+      const { component, form, set } = setup({ suggest: lookup });
+
+      type(set, form, 'đ');
+      expect(lookup).not.toHaveBeenCalled(); // not on every keystroke
+      await vi.waitFor(() => expect(component['suggestions']()).toEqual(['đã dạy', 'động', 'đen']));
+
+      expect(lookup).toHaveBeenCalledWith('đ');
+    });
+
+    it('narrows as the user keeps typing, asking only once for a burst of keystrokes', async () => {
+      const lookup = vi.fn().mockImplementation((prefix: string) => of(['đã dạy', 'động', 'đen'].filter((t) => t.startsWith(prefix))));
+      const { component, form, set } = setup({ suggest: lookup });
+
+      type(set, form, 'đ');
+      type(set, form, 'đã');
+      await vi.waitFor(() => expect(component['suggestions']()).toEqual(['đã dạy']));
+
+      expect(lookup).toHaveBeenCalledTimes(1);
+      expect(lookup).toHaveBeenCalledWith('đã');
+    });
+
+    it('does not offer the title that is already fully typed', async () => {
+      const { component, form, set } = setup({ suggest: () => of(['đã dạy', 'đã dạy học']) });
+
+      type(set, form, 'Đã dạy');
+      await vi.waitFor(() => expect(component['suggestions']()).toEqual(['đã dạy học']));
+    });
+
+    it('offers nothing for empty text and nothing when the lookup fails', async () => {
+      const failing = setup({ suggest: () => throwError(() => new ApiError(500, 'x')) });
+      type(failing.set, failing.form, 'abc');
+      await new Promise((r) => setTimeout(r, 300));
+      expect(failing.component['suggestions']()).toEqual([]);
+
+      TestBed.resetTestingModule();
+      const lookup = vi.fn().mockReturnValue(of(['x']));
+      const blank = setup({ suggest: lookup });
+      type(blank.set, blank.form, '   ');
+      await new Promise((r) => setTimeout(r, 300));
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('loading a task into the form does not go looking for suggestions; only typing does', async () => {
+      const lookup = vi.fn().mockReturnValue(of([]));
+      setup({ task: aTask({ title: 'Việc có sẵn' }), suggest: lookup });
+
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('without a lookup the title box is a plain box', async () => {
+      const { component, form, set } = setup();
+
+      type(set, form, 'abc');
+      await new Promise((r) => setTimeout(r, 300));
+
+      expect(component['suggestions']()).toEqual([]);
     });
   });
 });

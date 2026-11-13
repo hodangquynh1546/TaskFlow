@@ -11,6 +11,13 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+// No elastic bounce past the top or bottom of the page. On macOS it drags the sticky header and the side menu along
+// with the content, so the menu appears to be pulled up.
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -123,6 +130,41 @@ a {
   flex-wrap: wrap;
   margin-bottom: var(--tf-space-6);
 }
+
+// Pages that fit the window (the task list, new and edit task): the heading and frame stay put and only the content
+// scrolls. The height is the viewport minus everything around the page content (header, content padding, and the tab
+// bar on phones), so the page itself never scrolls.
+.tf-form-page,
+.tf-list-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - var(--tf-header-height) - var(--tf-space-2) - var(--tf-space-12));
+  min-height: 22rem;
+
+}
+
+// The form page keeps the card with its border and shadow in place; the fields scroll inside it (see task-form).
+.tf-form-page {
+  &__head { flex: none; }
+  &__head .tf-page-header { margin-bottom: var(--tf-space-4); }
+  &__body {
+    flex: 1;
+    min-height: 0;
+    max-width: 46rem;
+    display: flex;
+    flex-direction: column;
+    // Room for the card's offset shadow at the edges.
+    padding: 2px 10px 10px 2px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .tf-form-page,
+  .tf-list-page { height: calc(100dvh - var(--tf-header-height) - var(--tf-space-2) - var(--tf-tabbar-height) - var(--tf-space-8)); }
+}
+
+// The title box's suggestion list opens before its answer arrives, and an empty one is only a thin bar under the input.
+.ant-select-dropdown:not(:has(.ant-select-item, .ant-empty, .ant-select-item-empty)) { display: none; }
 
 // Rises into place. Used once per screen (the first load), staggered with --i; never on scroll.
 .tf-rise {

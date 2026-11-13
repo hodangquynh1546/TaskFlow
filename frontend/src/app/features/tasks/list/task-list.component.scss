@@ -24,34 +24,61 @@
 .control--range { min-width: 17rem; }
 .control--sort { min-width: 10.5rem; }
 
-.summary { min-height: 1.5rem; margin: var(--tf-space-4) 0 var(--tf-space-2); color: var(--tf-ink-soft); font-size: var(--tf-text-small); font-weight: 500; font-variant-numeric: tabular-nums; }
+// The list is its own box. Only `.list-box__scroll` scrolls, so the title, the filters, the count above the list and the
+// pager below it stay where they are.
+.page-header { margin-bottom: var(--tf-space-3); }
+.toolbar { flex: none; }
+.list-box {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--tf-space-4);
+  padding: var(--tf-space-4) var(--tf-space-4) var(--tf-space-3);
+  background: var(--tf-sky-tint);
+  box-shadow: var(--tf-shadow-panel);
+}
+.list-box__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  // Room for the rows' hover shadow, which the scroll box would otherwise clip.
+  padding: 4px 8px 10px 4px;
+}
+.summary { flex: none; min-height: 1.5rem; margin: 0 0 var(--tf-space-3); color: var(--tf-ink-soft); font-size: var(--tf-text-small); font-weight: 600; font-variant-numeric: tabular-nums; }
 
-// Each task is a sticker; the stagger plays once when the list appears.
-.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--tf-space-3); }
+// Each task is a card; two to a line on a wide screen, in reading order (left to right, then down).
+.rows { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-3); }
+@media (min-width: 1100px) {
+  .rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto 44px;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-areas: 'main menu' 'meta meta' 'status status';
   align-items: center;
-  column-gap: var(--tf-space-3);
-  padding: var(--tf-space-3) var(--tf-space-3) var(--tf-space-3) var(--tf-space-2);
+  column-gap: var(--tf-space-2);
+  row-gap: var(--tf-space-2);
+  padding: var(--tf-space-3) var(--tf-space-2) var(--tf-space-3) var(--tf-space-4);
   transition: transform 180ms var(--tf-ease-pop), box-shadow 180ms ease, opacity 200ms ease;
 
   &:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--tf-shadow-color); }
   &--busy { opacity: 0.55; }
   &--done { background: var(--tf-mint-tint); }
   // Overdue is the one row state that must be seen from across the list: red edge and a red bar, not just the small chip.
-  &--overdue { border-color: var(--tf-alarm); background: var(--tf-alarm-tint); box-shadow: inset 6px 0 0 var(--tf-alarm); padding-left: var(--tf-space-4); }
+  &--overdue { border-color: var(--tf-alarm); background: var(--tf-alarm-tint); box-shadow: inset 6px 0 0 var(--tf-alarm); padding-left: var(--tf-space-5, 1.25rem); }
   &--overdue:hover { box-shadow: inset 6px 0 0 var(--tf-alarm), 5px 5px 0 var(--tf-shadow-color); }
   &--done &__title { color: var(--tf-ink-soft); text-decoration: line-through; text-decoration-thickness: 2px; }
 
-  &__main { min-width: 0; }
+  &__main { grid-area: main; min-width: 0; }
   &__title { display: block; font-weight: 700; font-size: 1.0625rem; color: var(--tf-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration-color: var(--tf-edge); }
   &__time { margin-top: 2px; }
   &__description { margin-top: 2px; color: var(--tf-ink-soft); font-size: var(--tf-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  // Fixed columns so priority, status and deadline line up from one row to the next.
-  &__meta { display: grid; grid-template-columns: 22px 10.5rem; align-items: center; column-gap: var(--tf-space-3); justify-content: end; }
-  &__menu { min-width: 44px; min-height: 44px; padding: 0; }
+  &__meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-2) var(--tf-space-4); }
+  &__status { grid-area: status; display: flex; }
+  &__menu { grid-area: menu; min-width: 44px; min-height: 44px; padding: 0; align-self: start; }
 }
 
 // Three buttons instead of a select: the state is visible and one click changes it.
@@ -59,7 +86,7 @@
   display: inline-flex; border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-pill); overflow: hidden; background: var(--tf-paper);
 
   &__btn {
-    min-height: 40px; padding: 0 var(--tf-space-3); border: 0; background: transparent; color: var(--tf-ink-soft);
+    flex: 1; min-height: 40px; padding: 0 var(--tf-space-2); border: 0; background: transparent; color: var(--tf-ink-soft);
     font: inherit; font-size: var(--tf-text-caption); font-weight: 700; white-space: nowrap; cursor: pointer;
     transition: background-color 160ms ease, transform 160ms var(--tf-ease-pop);
     & + & { border-inline-start: 2px solid var(--tf-edge); }
@@ -73,15 +100,25 @@
   }
 }
 
+// The row a new task landed on: two soft pulses so the eye finds it after the scroll.
+.row--flash { animation: row-flash 1.1s ease-in-out 2; }
+@keyframes row-flash {
+  0%, 100% { outline: 4px solid transparent; outline-offset: 3px; }
+  50% { outline: 4px solid var(--tf-tangerine); outline-offset: 3px; }
+}
+
 .sk { height: 76px; border-radius: var(--tf-radius-sticker); }
 
-.pager { display: flex; justify-content: flex-end; margin-top: var(--tf-space-6); }
-
+.pager { flex: none; display: flex; justify-content: flex-end; padding-top: var(--tf-space-3); }
 :host ::ng-deep .menu-danger { font-weight: 700; }
 
-// Tablet and below: filters collapse behind a button and rows become two lines.
+// Tablet and below: filters collapse behind a button.
 @media (max-width: 767.98px) {
-  .toolbar { grid-template-columns: minmax(0, 1fr); padding: var(--tf-space-3) var(--tf-space-4); }
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr); padding: var(--tf-space-3) var(--tf-space-4);
+    // Open filters scroll inside their own box instead of pushing the list off the screen.
+    max-height: 55dvh; overflow-y: auto;
+  }
   .toolbar__search, .toolbar__filters, .toolbar__sort { grid-column: 1; grid-row: auto; justify-self: stretch; }
   .toolbar__toggle { display: inline-flex; align-items: center; gap: var(--tf-space-2); }
   .toolbar__filters { display: none; flex-direction: column; align-items: stretch; }
@@ -90,14 +127,5 @@
   .toolbar__sort { flex-wrap: nowrap; }
   .toolbar__sort .control--sort { width: auto; flex: 1; min-width: 0; }
 
-  .row {
-    grid-template-columns: minmax(0, 1fr) 44px;
-    grid-template-areas: 'main menu' 'meta meta' 'status status';
-    row-gap: var(--tf-space-1);
-  }
-  .row__main { grid-area: main; }
-  .row__menu { grid-area: menu; }
-  .row__meta { grid-area: meta; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: var(--tf-space-2) var(--tf-space-4); }
-  .row__status { grid-area: status; justify-self: start; }
   .pager { justify-content: center; }
 }

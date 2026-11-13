@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -23,6 +23,11 @@ import { DayLayout, ScheduledBlock, layoutDay, snapToQuarter } from './schedule-
 /** Pixels per minute on the timeline: an hour is 84px tall, so a 15 minute block is still readable. */
 export const PX_PER_MINUTE = 1.4;
 const MIN_BLOCK_HEIGHT = 26;
+/** How long a just-saved task's block stays lit. */
+const FLASH_MS = 2400;
+/** Matches `.timeline { margin: 16px ... }` and the hour label that sticks out 12px above its line. */
+const TIMELINE_MARGIN_TOP = 16;
+const HOUR_LABEL_ROOM = 14;
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const clock = (minute: number): string => `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
@@ -49,6 +54,11 @@ export class ScheduleComponent {
 
   /** The day shown, "yyyy-MM-dd", bound from the query string by the router. Anything unusable means today. */
   readonly date = input<string>();
+
+  /** A task to point at: set after saving one from here, so the planner scrolls to its block. */
+  readonly highlight = input<string>();
+  protected readonly flashId = signal<string | null>(null);
+  private flashTimer: ReturnType<typeof setTimeout> | undefined;
 
   protected readonly today = signal(formatDay(new Date()));
   protected readonly day = computed(() => {
@@ -103,12 +113,22 @@ export class ScheduleComponent {
   private readonly reload$ = new BehaviorSubject<void>(undefined);
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
-  /** Where the timeline should open: an hour before the first task, or before "now" when looking at today. */
+  /**
+   * Where the timeline opens. Today: the current hour is the first line, so what is happening now is in view without
+   * scrolling. Any other day: an hour before the first task. In pixels of scroll, counting the timeline's top margin.
+   */
   protected readonly focusTop = computed(() => {
-    const layout = this.layout();
-    const first = layout.blocks.length ? Math.min(...layout.blocks.map((b) => this.top(b))) : null;
-    const target = this.isToday() && this.nowTop() !== null ? Math.min(this.nowTop()!, first ?? Infinity) : first;
-    return target === null ? 0 : Math.max(0, target - 60 * PX_PER_MINUTE);
+    const { startHour, endHour, blocks } = this.layout();
+    if (this.isToday()) {
+      const hour = this.now().getHours();
+      if (hour < startHour) {
+        return 0;
+      }
+      // Past the last drawn hour the scroll simply stops at the end of the day.
+      return hour >= endHour ? this.gridHeight() : Math.max(0, TIMELINE_MARGIN_TOP + this.hourTop(hour) - HOUR_LABEL_ROOM);
+    }
+    const first = blocks.length ? Math.min(...blocks.map((b) => this.top(b))) : null;
+    return first === null ? 0 : Math.max(0, TIMELINE_MARGIN_TOP + first - 60 * PX_PER_MINUTE);
   });
 
   constructor() {
@@ -139,18 +159,32 @@ export class ScheduleComponent {
         this.state.set('ready');
       });
 
-    // Opens on the part of the day that matters instead of at 06:00. Runs when a day's data arrives, not on every tick.
+    // Opens on the part of the day that matters instead of at 06:00. Runs when a day's data arrives, not on every
+    // minute tick: reading the target untracked keeps the clock from yanking the scroll away from the user.
     effect(() => {
       if (this.state() !== 'ready') {
         return;
       }
-      const target = this.focusTop();
+      // Everything but the state is read untracked: removing the highlight from the address afterwards must not
+      // make this run again and scroll the planner back to its usual place.
+      const { pointedAt, target, block } = untracked(() => {
+        const pointedAt = this.highlight();
+        const found = pointedAt ? this.layout().blocks.find((b) => b.task.id === pointedAt) : undefined;
+        return { pointedAt, target: this.focusTop(), block: found };
+      });
       afterNextRender(() => {
         const element = this.scroller()?.nativeElement;
-        if (element) {
-          element.scrollTop = target;
+        if (!element) {
+          return;
         }
+        // The block's middle goes to the middle of the visible part; otherwise the usual opening position.
+        element.scrollTop = block
+          ? Math.max(0, TIMELINE_MARGIN_TOP + this.top(block) + this.height(block) / 2 - element.clientHeight / 2)
+          : target;
       }, { injector: this.injector });
+      if (pointedAt) {
+        this.flash(block?.task.id ?? null);
+      }
     });
 
     // Keeps the "now" line and "today" honest while the page stays open, including across midnight.
@@ -158,7 +192,20 @@ export class ScheduleComponent {
       this.now.set(new Date());
       this.today.set(formatDay(new Date()));
     }, 60_000);
-    this.destroyRef.onDestroy(() => clearInterval(timer));
+    this.destroyRef.onDestroy(() => {
+      clearInterval(timer);
+      clearTimeout(this.flashTimer);
+    });
+  }
+
+  /** Lights the block for a moment, then removes the request from the address so a reload does not repeat it. */
+  private flash(id: string | null): void {
+    if (id) {
+      this.flashId.set(id);
+      clearTimeout(this.flashTimer);
+      this.flashTimer = setTimeout(() => this.flashId.set(null), FLASH_MS);
+    }
+    void this.router.navigate([], { queryParams: { highlight: null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   protected shift(days: number): void {

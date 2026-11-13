@@ -1,4 +1,13 @@
-.head { margin-bottom: var(--tf-space-4); }
+// The title stays put and only the panels below it scroll (same as the task list and the task forms).
+.head { flex: none; margin-bottom: var(--tf-space-4); }
+.dash-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  // Room for the panels' offset shadows, which the scroll box would otherwise clip.
+  padding: 2px 10px 12px 2px;
+}
 
 // Bento: panels of different sizes, not a row of identical cards.
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--tf-space-6); align-items: stretch; }

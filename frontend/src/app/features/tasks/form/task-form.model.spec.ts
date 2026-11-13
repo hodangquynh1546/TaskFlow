@@ -5,12 +5,10 @@ import {
   EMPTY_TASK_FORM,
   TaskFormValue,
   clockValidator,
-  endOfDay,
   formValueToPayload,
   resolveDuration,
   resolveStart,
   scheduleValidator,
-  startOfDay,
   taskToFormValue,
 } from './task-form.model';
 
@@ -23,7 +21,7 @@ const existing: Task = {
 
 describe('defaults', () => {
   it('a new task is Todo and Medium with nothing scheduled', () => {
-    expect(EMPTY_TASK_FORM).toMatchObject({ status: 'Todo', priority: 'Medium', startDate: null, startTime: '', durationChoice: 'none', dueDate: null });
+    expect(EMPTY_TASK_FORM).toMatchObject({ status: 'Todo', priority: 'Medium', startDate: null, startTime: '', durationChoice: 'none' });
   });
 });
 
@@ -91,23 +89,18 @@ describe('formValueToPayload', () => {
     expect(formValueToPayload(value({ status: 'InProgress', priority: 'High' }))).toMatchObject({ status: 'InProgress', priority: 'High' });
   });
 
-  it('a due date picked as a day falls at the end of that local day', () => {
-    const payload = formValueToPayload(value({ dueDate: new Date(2026, 10, 12, 8, 15) }));
-
-    expect(new Date(payload.dueDate!)).toEqual(new Date(2026, 10, 12, 23, 59, 0, 0));
-  });
-
-  describe('editing a task that already has a due time', () => {
-    it('keeps the original time when the day is left alone', () => {
-      expect(formValueToPayload(value({ dueDate: new Date(existing.dueDate!) }), existing).dueDate).toBe(new Date(existing.dueDate!).toISOString());
+  describe('the due date', () => {
+    it('is never sent for a scheduled task: the server makes it due when its block ends', () => {
+      expect(formValueToPayload(value({ startDate: new Date(2026, 10, 12), startTime: '09:00', durationChoice: '60' }), existing).dueDate).toBeNull();
+      expect(formValueToPayload(value({ startDate: new Date(2026, 10, 12), startTime: '09:00', durationChoice: '60' })).dueDate).toBeNull();
     });
 
-    it('moves to the end of the new day when another day is chosen', () => {
-      expect(new Date(formValueToPayload(value({ dueDate: new Date(2026, 10, 25, 9, 0) }), existing).dueDate!)).toEqual(new Date(2026, 10, 25, 23, 59, 0, 0));
+    it('a task with no start time keeps the due date it already had, so editing does not erase it', () => {
+      expect(formValueToPayload(value(), existing).dueDate).toBe(existing.dueDate);
     });
 
-    it('clearing the date clears it', () => {
-      expect(formValueToPayload(value({ dueDate: null }), existing).dueDate).toBeNull();
+    it('a new task with no start time has no due date', () => {
+      expect(formValueToPayload(value()).dueDate).toBeNull();
     });
   });
 });
@@ -149,13 +142,13 @@ describe('taskToFormValue', () => {
 });
 
 describe('scheduleValidator', () => {
-  const group = (patch: Partial<TaskFormValue>, originalDue: string | null = null) => {
+  const group = (patch: Partial<TaskFormValue>) => {
     const v = { ...EMPTY_TASK_FORM, ...patch };
     const g = new FormGroup({
       startDate: new FormControl(v.startDate), startTime: new FormControl(v.startTime), durationChoice: new FormControl(v.durationChoice),
-      customMinutes: new FormControl(v.customMinutes), dueDate: new FormControl(v.dueDate),
+      customMinutes: new FormControl(v.customMinutes),
     });
-    return scheduleValidator(() => originalDue)(g);
+    return scheduleValidator()(g);
   };
   const day = new Date(2026, 10, 12);
 
@@ -199,28 +192,6 @@ describe('scheduleValidator', () => {
     });
   });
 
-  describe('BR-06: the start must not be after the due moment', () => {
-    it('rejects a start after the due day', () => {
-      expect(group({ startDate: new Date(2026, 10, 13), startTime: '09:00', dueDate: new Date(2026, 10, 12) })).toEqual({ dateOrder: true });
-    });
-
-    it('accepts the same day, since a due day means the end of that day', () => {
-      expect(group({ startDate: day, startTime: '23:00', dueDate: day })).toBeNull();
-    });
-
-    it('is judged against the due time the task already has when its day is unchanged', () => {
-      const dueAt0800 = new Date(2026, 10, 12, 8, 0).toISOString();
-
-      expect(group({ startDate: day, startTime: '15:00', dueDate: new Date(dueAt0800) }, dueAt0800)).toEqual({ dateOrder: true });
-      expect(group({ startDate: day, startTime: '07:00', dueDate: new Date(dueAt0800) }, dueAt0800)).toBeNull();
-    });
-
-    it('is satisfied when either is missing', () => {
-      expect(group({ startDate: day, startTime: '09:00' })).toBeNull();
-      expect(group({ dueDate: day })).toBeNull();
-    });
-  });
-
   it('reports several problems at once', () => {
     expect(group({ startTime: '09:00', durationChoice: 'custom', customMinutes: 0 })).toEqual({ timeWithoutDate: true, customDuration: true });
   });
@@ -233,12 +204,5 @@ describe('clockValidator', () => {
 
   it.each([['24:00'], ['12:60'], ['abc'], ['9'], ['09:5'], ['25:10']])('rejects %j', (text) => {
     expect(clockValidator(new FormControl(text))).toEqual({ invalidTime: true });
-  });
-});
-
-describe('day helpers', () => {
-  it('startOfDay clears the time, endOfDay is 23:59 of the same local day', () => {
-    expect(startOfDay(new Date(2026, 10, 12, 18, 30, 15, 500))).toEqual(new Date(2026, 10, 12, 0, 0, 0, 0));
-    expect(endOfDay(new Date(2026, 10, 12, 3, 4))).toEqual(new Date(2026, 10, 12, 23, 59, 0, 0));
   });
 });

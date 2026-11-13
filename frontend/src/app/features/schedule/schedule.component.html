@@ -52,7 +52,7 @@
 
               @for (block of layout().blocks; track block.task.id; let i = $index) {
                 <a class="block" [class]="'block block--' + block.task.status" [class.block--high]="block.task.priority === 'High'"
-                   [class.block--estimated]="block.estimated" [class.block--short]="isShort(block)"
+                   [class.block--estimated]="block.estimated" [class.block--flash]="block.task.id === flashId()" [class.block--short]="isShort(block)"
                    [routerLink]="['/tasks', block.task.id]" [attr.aria-label]="label(block)" [attr.title]="label(block)"
                    [style.top.px]="top(block)" [style.height.px]="height(block)"
                    [style.left.%]="(block.lane / block.lanes) * 100" [style.width.%]="100 / block.lanes"

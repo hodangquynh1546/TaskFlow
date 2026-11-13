@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Component } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideNzIconsTesting } from 'ng-zorro-antd/icon/testing';
 
 import { User } from '../../core/auth/auth.models';
@@ -144,5 +144,38 @@ describe('ShellComponent', () => {
     const { el } = setup();
 
     expect(el.querySelector('header tf-prefs button.trigger')).not.toBeNull();
+  });
+
+  describe('scrolling', () => {
+    it('only the content area scrolls: the shell, side menu and header are fixed to the window', () => {
+      const { el } = setup();
+
+      expect(el.querySelector('main#main')!.classList.contains('content')).toBe(true);
+      expect(el.querySelector('.shell')).not.toBeNull();
+      expect(el.querySelector('.header')).not.toBeNull();
+      expect(el.querySelector('.sidebar')).not.toBeNull();
+    });
+
+    it('opening another screen starts it at the top, but a change of query on the same screen leaves the scroll alone', async () => {
+      const scrolls: number[] = [];
+      Object.defineProperty(HTMLElement.prototype, 'scrollTop', { configurable: true, get: () => 0, set: (value: number) => scrolls.push(value) });
+      try {
+        const { fixture } = setup();
+        const router = TestBed.inject(Router);
+
+        await router.navigateByUrl('/tasks');
+        expect(scrolls).toEqual([0]);
+
+        await router.navigateByUrl('/tasks?status=Todo');
+        await router.navigateByUrl('/tasks?status=Todo&page=2');
+        expect(scrolls).toEqual([0]);
+
+        await router.navigateByUrl('/schedule');
+        expect(scrolls).toEqual([0, 0]);
+        fixture.destroy();
+      } finally {
+        delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;
+      }
+    });
   });
 });

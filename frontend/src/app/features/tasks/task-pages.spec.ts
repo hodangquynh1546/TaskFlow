@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../core/http/api-error';
+import { BrowseMemory } from '../../core/navigation/browse-memory';
 import { NotifyService } from '../../core/notify/notify.service';
 import { ConfirmService } from '../../shared/ui/confirm.service';
 import { TaskCreateComponent } from './create/task-create.component';
@@ -53,7 +54,7 @@ const formOf = (fixture: ComponentFixture<unknown>): TaskFormComponent =>
 const submitForm = (el: HTMLElement) => el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
 
 describe('TaskCreateComponent', () => {
-  it('creates the task, thanks the user and returns to the list when there is no earlier page', async () => {
+  it('creates the task, thanks the user and opens the task list on the new task', async () => {
     const { mount, tasks, notify, navigateByUrl } = setup(TaskCreateComponent);
     tasks.create.mockReturnValue(of(aTask({ id: 'new-1' })));
     const fixture = mount();
@@ -64,10 +65,10 @@ describe('TaskCreateComponent', () => {
 
     expect(tasks.create).toHaveBeenCalledWith(expect.objectContaining({ title: 'Việc mới', priority: 'High', status: 'Todo', description: null }));
     expect(notify.success).toHaveBeenCalledWith('Đã tạo công việc');
-    expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=new-1', { replaceUrl: true });
   });
 
-  it('after creating, goes back to the page the user came from, not to the new task', async () => {
+  it('after creating from the day planner, returns to the planner pointing at the new task', async () => {
     const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/schedule?date=2026-11-12') } } as never);
@@ -78,7 +79,35 @@ describe('TaskCreateComponent', () => {
     submitForm(fixture.nativeElement);
     await settle(fixture);
 
-    expect(navigateByUrl).toHaveBeenCalledWith('/schedule?date=2026-11-12', { replaceUrl: true });
+    expect(navigateByUrl).toHaveBeenCalledWith('/schedule?date=2026-11-12&highlight=new-1', { replaceUrl: true });
+  });
+
+  it('after creating from the overview, opens the task list on the new task', async () => {
+    const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/dashboard') } } as never);
+    tasks.create.mockReturnValue(of(aTask({ id: 'new-1' })));
+    const fixture = mount();
+
+    formOf(fixture)['form'].patchValue({ title: 'Việc mới' });
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=new-1', { replaceUrl: true });
+  });
+
+  it('keeps the sort of the list the form was opened from', async () => {
+    const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/tasks?sortBy=priority&sortDir=desc&page=4') } } as never);
+    tasks.create.mockReturnValue(of(aTask({ id: 'new-1' })));
+    const fixture = mount();
+
+    formOf(fixture)['form'].patchValue({ title: 'Việc mới' });
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?sortBy=priority&sortDir=desc&highlight=new-1', { replaceUrl: true });
   });
 
   it('does not call the server for an invalid form', async () => {
@@ -104,14 +133,14 @@ describe('TaskCreateComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Ngày bắt đầu không được sau hạn hoàn thành.');
     expect(navigate).not.toHaveBeenCalled();
 
-    // Fixing the due date (the other half of the rule) must be enough: the stale start-date message goes away too.
+    // Editing any field clears the server's verdict, so the stale start-date message goes away.
     tasks.create.mockReturnValue(of(aTask({ id: 'ok' })));
-    formOf(fixture)['form'].patchValue({ dueDate: new Date(2030, 0, 1) });
+    formOf(fixture)['form'].patchValue({ startDate: new Date(2030, 0, 1) });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).not.toContain('Ngày bắt đầu không được sau hạn hoàn thành.');
     submitForm(fixture.nativeElement);
     await settle(fixture);
-    expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=ok', { replaceUrl: true });
   });
 
   it('ignores a second submit while the first is running', async () => {
@@ -134,6 +163,15 @@ describe('TaskCreateComponent', () => {
 
     expect(navigateByUrl).toHaveBeenCalledWith('/tasks', { replaceUrl: true });
     expect(tasks.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the back link and heading outside the scrolling area, so only the form scrolls', () => {
+    const { mount } = setup(TaskCreateComponent);
+    const el = mount().nativeElement as HTMLElement;
+
+    expect(el.querySelector('.tf-form-page__head .tf-back')).not.toBeNull();
+    expect(el.querySelector('.tf-form-page__head h1')).not.toBeNull();
+    expect(el.querySelector('.tf-form-page__body tf-task-form')).not.toBeNull();
   });
 
   it('has a back link and a heading', () => {
@@ -189,8 +227,8 @@ describe('TaskEditComponent', () => {
     expect(formOf(fixture)['form'].getRawValue().title).toBe('Đã có');
   });
 
-  it('saves with PUT, thanks the user and returns to the task', async () => {
-    const { mount, tasks, notify, navigate } = setup(TaskEditComponent, 't1');
+  it('saves with PUT, thanks the user and opens the list on the edited task', async () => {
+    const { mount, tasks, notify, navigateByUrl } = setup(TaskEditComponent, 't1');
     tasks.get.mockReturnValue(of(aTask()));
     tasks.update.mockReturnValue(of(aTask({ title: 'Mới' })));
     const fixture = mount();
@@ -202,7 +240,7 @@ describe('TaskEditComponent', () => {
 
     expect(tasks.update).toHaveBeenCalledWith('t1', expect.objectContaining({ title: 'Mới', status: 'Completed' }));
     expect(notify.success).toHaveBeenCalledWith('Đã lưu thay đổi');
-    expect(navigate).toHaveBeenCalledWith(['/tasks', 't1']);
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=t1', { replaceUrl: true });
   });
 
   it('sends a cleared description as null so it is actually removed', async () => {
@@ -230,6 +268,50 @@ describe('TaskEditComponent', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Tiêu đề quá dài.');
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('after saving, shows the task in the list the user opened the edit form from, keeping its sort', async () => {
+    const { mount, tasks, navigateByUrl } = setup(TaskEditComponent, 't1');
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/tasks?sortBy=dueDate&sortDir=asc&page=2') } } as never);
+    tasks.get.mockReturnValue(of(aTask()));
+    tasks.update.mockReturnValue(of(aTask()));
+    const fixture = mount();
+    await settle(fixture);
+
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?sortBy=dueDate&sortDir=asc&highlight=t1', { replaceUrl: true });
+  });
+
+  it('editing through the detail page of a filtered list returns to that same filtered list', async () => {
+    const { mount, tasks, navigateByUrl } = setup(TaskEditComponent, 't1');
+    const router = TestBed.inject(Router);
+    TestBed.inject(BrowseMemory).note('/tasks?status=InProgress&page=2');
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/tasks/t1') } } as never);
+    tasks.get.mockReturnValue(of(aTask()));
+    tasks.update.mockReturnValue(of(aTask()));
+    const fixture = mount();
+    await settle(fixture);
+
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?status=InProgress&highlight=t1', { replaceUrl: true });
+  });
+
+  it('keeps the back link and heading outside the scrolling area, so only the form scrolls', async () => {
+    const { mount, tasks } = setup(TaskEditComponent, 't1');
+    tasks.get.mockReturnValue(of(aTask()));
+    const fixture = mount();
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.tf-form-page__head .tf-back')).not.toBeNull();
+    expect(el.querySelector('.tf-form-page__head h1')).not.toBeNull();
+    expect(el.querySelector('.tf-form-page__body tf-task-form')).not.toBeNull();
+    expect(el.querySelector('.tf-form-page__body .tf-back')).toBeNull();
   });
 
   it('if the task was deleted meanwhile, says so and goes to the list', async () => {

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NzAutocompleteModule } from 'ng-zorro-antd/auto-complete';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -27,11 +28,15 @@ import {
 } from './task-form.model';
 import { DURATION_PRESETS, MAX_DURATION_MINUTES, blockEnd, formatClock, formatDuration } from '../../../shared/util/duration';
 import { parseDay } from '../task-query';
+import { Observable, catchError, debounceTime, distinctUntilChanged, filter, map, of, switchMap } from 'rxjs';
+
+/** Wait for a short pause in typing before asking the server for suggestions. */
+const SUGGEST_DELAY_MS = 200;
 
 @Component({
   selector: 'tf-task-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, NzButtonModule, NzDatePickerModule, NzFormModule, NzInputModule, NzInputNumberModule, NzRadioModule, NzSelectModule, TranslatePipe],
+  imports: [ReactiveFormsModule, NzAutocompleteModule, NzButtonModule, NzDatePickerModule, NzFormModule, NzInputModule, NzInputNumberModule, NzRadioModule, NzSelectModule, TranslatePipe],
   templateUrl: './task-form.component.html',
   styleUrl: './task-form.component.scss',
 })
@@ -44,6 +49,12 @@ export class TaskFormComponent {
   readonly saving = input(false);
   /** Where a new task starts, when the user came from a free slot on the day calendar ("yyyy-MM-dd" and "HH:mm"). */
   readonly prefill = input<{ date?: string; time?: string } | null>(null);
+
+  /**
+   * Looks up titles the user has used before that start with the text typed so far. Left out, the title box simply offers
+   * nothing; the form stays a plain form that does not know where suggestions come from.
+   */
+  readonly suggest = input<((prefix: string) => Observable<string[]>) | null>(null);
 
   readonly save = output<TaskPayload>();
   readonly cancelled = output<void>();
@@ -68,9 +79,8 @@ export class TaskFormComponent {
       startTime: [EMPTY_TASK_FORM.startTime, [clockValidator]],
       durationChoice: [EMPTY_TASK_FORM.durationChoice],
       customMinutes: [EMPTY_TASK_FORM.customMinutes as number | null],
-      dueDate: [EMPTY_TASK_FORM.dueDate as Date | null],
     },
-    { validators: scheduleValidator(() => this.task()?.dueDate ?? null) },
+    { validators: scheduleValidator() },
   );
 
   private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
@@ -91,6 +101,25 @@ export class TaskFormComponent {
   });
 
   protected readonly formError = signal('');
+
+  /** What the title box offers while the user types: earlier titles that begin with the text, minus one that is already complete. */
+  protected readonly suggestions = toSignal(
+    toObservable(this.suggest).pipe(
+      switchMap((lookup) =>
+        lookup === null
+          ? of([] as string[])
+          : this.form.controls.title.valueChanges.pipe(
+              // Loading a task into the form also changes the title; only the user's own typing asks for suggestions.
+              filter(() => this.form.controls.title.dirty),
+              map((text) => (text ?? '').trim()),
+              debounceTime(SUGGEST_DELAY_MS),
+              distinctUntilChanged(),
+              switchMap((text) => (text === '' ? of([] as string[]) : lookup(text).pipe(catchError(() => of([] as string[]))).pipe(map((titles) => titles.filter((title) => title.toLowerCase() !== text.toLowerCase()))))),
+            ),
+      ),
+    ),
+    { initialValue: [] as string[] },
+  );
 
   constructor() {
     clearServerErrorOnEdit(this.form);
@@ -116,7 +145,7 @@ export class TaskFormComponent {
     }
   }
 
-  protected errorText(name: 'title' | 'description' | 'startDate' | 'startTime' | 'customMinutes' | 'dueDate'): string {
+  protected errorText(name: 'title' | 'description' | 'startDate' | 'startTime' | 'customMinutes'): string {
     const control = this.form.controls[name];
     const t = this.i18n.t.bind(this.i18n);
     const messages = {
@@ -125,7 +154,6 @@ export class TaskFormComponent {
       startDate: {},
       startTime: { invalidTime: t('err.timeFormat') },
       customMinutes: {},
-      dueDate: {},
     } as const;
     const own = firstError(control, messages[name]);
     if (own) {
@@ -138,9 +166,6 @@ export class TaskFormComponent {
     }
     if (name === 'customMinutes' && group.hasError('customDuration') && (control.dirty || control.touched)) {
       return t('err.customMinutes', { max: MAX_DURATION_MINUTES });
-    }
-    if (name === 'dueDate' && group.hasError('dateOrder')) {
-      return t('err.dueBeforeStart');
     }
     return '';
   }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -34,7 +34,6 @@ import { DueLabelComponent } from '../../../shared/ui/due-label.component';
 import { ConfirmService } from '../../../shared/ui/confirm.service';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
-import { PriorityMarkerComponent } from '../../../shared/ui/priority-marker.component';
 import { TimeBlockComponent } from '../../../shared/ui/time-block.component';
 import {
   PAGE_SIZES,
@@ -52,6 +51,8 @@ import { TaskService } from '../task.service';
 
 /** Room an open row menu needs below its button: two items, a divider and the shadow. */
 const MENU_HEIGHT = 130;
+/** How long a new task's row stays lit. */
+const FLASH_MS = 2400;
 
 type LoadState = 'loading' | 'ready' | 'error';
 
@@ -68,7 +69,7 @@ const SORT_KEYS: Readonly<Record<TaskSortField, MessageKey>> = {
   imports: [
     FormsModule, ReactiveFormsModule, RouterLink,
     NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzDropDownModule, NzIconModule, NzInputModule, NzMenuModule, NzPaginationModule, NzSelectModule,
-    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, PriorityMarkerComponent, TimeBlockComponent, TranslatePipe,
+    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, TimeBlockComponent, TranslatePipe,
   ],
   templateUrl: './task-list.component.html',
   styleUrl: './task-list.component.scss',
@@ -80,6 +81,7 @@ export class TaskListComponent {
   private readonly notify = inject(NotifyService);
   private readonly confirm = inject(ConfirmService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   protected readonly i18n = inject(I18nService);
 
   protected readonly statuses = TASK_STATUSES;
@@ -91,7 +93,18 @@ export class TaskListComponent {
   protected readonly sortKeys = SORT_KEYS;
 
   /** The URL is the single source of truth for filters, sorting and page. */
-  protected readonly query = toSignal(this.route.queryParamMap.pipe(map(parseTaskQuery)), { initialValue: parseTaskQuery(this.route.snapshot.queryParamMap) });
+  protected readonly query = toSignal(
+    // Params that are not part of the query (like `highlight`) come and go without changing it, and must not reload the list.
+    this.route.queryParamMap.pipe(map(parseTaskQuery), distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b))),
+    { initialValue: parseTaskQuery(this.route.snapshot.queryParamMap) },
+  );
+
+  /** A task to bring into view: set after creating one, so the list opens on the page that holds it. */
+  private readonly highlight = toSignal(this.route.queryParamMap.pipe(map((params) => params.get('highlight'))), {
+    initialValue: this.route.snapshot.queryParamMap.get('highlight'),
+  });
+  /** The row that is flashing right now. */
+  protected readonly flashId = signal<string | null>(null);
   protected readonly filtersActive = computed(() => hasActiveFilters(this.query()));
   protected readonly activeFilterCount = computed(() => {
     const q = this.query();
@@ -125,8 +138,21 @@ export class TaskListComponent {
   /** true = refresh in place (after a change the user made) without swapping the list for skeletons. */
   private readonly reload$ = new BehaviorSubject<boolean>(false);
 
+  private locating: string | null = null;
+  private flashTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor() {
     effect(() => this.searchControl.setValue(this.query().search, { emitEvent: false }));
+
+    // Bringing a task into view: its page is found first, then the list is on that page and the row is scrolled to.
+    effect(() => {
+      const id = this.highlight();
+      const page = this.data();
+      if (id && page && this.state() === 'ready') {
+        untracked(() => this.reveal(id, page));
+      }
+    });
+    this.destroyRef.onDestroy(() => clearTimeout(this.flashTimer));
 
     this.searchControl.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
@@ -164,6 +190,55 @@ export class TaskListComponent {
         this.error.set(null);
         this.state.set('ready');
       });
+  }
+
+  private reveal(id: string, page: PagedResult<Task>): void {
+    if (page.items.some((task) => task.id === id)) {
+      this.locating = null;
+      this.show(id);
+      return;
+    }
+    if (this.locating === id) {
+      return;
+    }
+    this.locating = id;
+    this.tasks.position(id, { ...this.query(), page: 1 }).subscribe({
+      next: ({ page: target }) => {
+        this.locating = null;
+        if (target !== this.query().page) {
+          this.navigate({ page: target }, true);
+        } else {
+          // Right page, but the list was fetched before the task existed: fetch it again, once.
+          this.locating = id;
+          this.reload$.next(true);
+        }
+      },
+      error: () => {
+        this.locating = null;
+        // The filters hide it (a status it no longer has, say). They stay: they are what the user asked to see. Saying so
+        // explains why the task is not on screen.
+        if (hasActiveFilters(this.query())) {
+          this.notify.info(this.i18n.t('tasks.hiddenByFilters'));
+        }
+        this.dropHighlight();
+      },
+    });
+  }
+
+  private show(id: string): void {
+    this.flashId.set(id);
+    this.dropHighlight();
+    afterNextRender(() => {
+      const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById(`task-${id}`)?.scrollIntoView?.({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+    }, { injector: this.injector });
+    clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(() => this.flashId.set(null), FLASH_MS);
+  }
+
+  /** The id is only a request for this visit; leaving it in the address would re-announce it on every reload. */
+  private dropHighlight(): void {
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { highlight: null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   protected navigate(patch: Partial<TaskListQuery>, replaceUrl = false): void {

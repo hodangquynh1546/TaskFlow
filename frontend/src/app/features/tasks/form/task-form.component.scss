@@ -1,4 +1,7 @@
-.task-form { max-width: 42rem; padding: var(--tf-space-8); box-shadow: var(--tf-shadow-panel); }
+// The card is the fixed frame: border, shadow and the buttons stay put while the fields scroll inside it.
+:host { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+.task-form { display: flex; flex-direction: column; min-height: 0; max-width: 42rem; padding: var(--tf-space-8) var(--tf-space-8) var(--tf-space-6); box-shadow: var(--tf-shadow-panel); }
+.task-form__fields { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--tf-space-3) 0 0; margin-right: calc(-1 * var(--tf-space-3)); }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--tf-space-6); }
 .full { width: 100%; }
 .due { max-width: 50%; }
@@ -14,10 +17,12 @@
   font-weight: 500;
 }
 
-.actions { display: flex; justify-content: flex-end; gap: var(--tf-space-3); margin-top: var(--tf-space-4); }
+.actions { flex: none; display: flex; justify-content: flex-end; gap: var(--tf-space-3); margin-top: var(--tf-space-4); padding-top: var(--tf-space-4); border-top: 2px dashed var(--tf-line); }
+.form-error { flex: none; }
 
 @media (max-width: 599.98px) {
   .task-form { padding: var(--tf-space-4); box-shadow: var(--tf-shadow-small); }
+  .task-form__fields { padding-right: var(--tf-space-2); margin-right: calc(-1 * var(--tf-space-2)); }
   .two-col { grid-template-columns: 1fr; }
   .due { max-width: 100%; }
   .actions { flex-direction: column-reverse; }

@@ -24,7 +24,6 @@ export interface TaskFormValue {
   durationChoice: string;
   /** Minutes typed when the choice is "custom". */
   customMinutes: number | null;
-  dueDate: Date | null;
 }
 
 export const EMPTY_TASK_FORM: TaskFormValue = {
@@ -36,21 +35,7 @@ export const EMPTY_TASK_FORM: TaskFormValue = {
   startTime: '',
   durationChoice: 'none',
   customMinutes: null,
-  dueDate: null,
 };
-
-export function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-}
-
-/** A due date is chosen as a day; unless told otherwise it falls at the end of that local day (quyết định #5). */
-export function endOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 0, 0);
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
 
 export function taskToFormValue(task: Task): TaskFormValue {
   const start = task.startDate ? new Date(task.startDate) : null;
@@ -65,7 +50,6 @@ export function taskToFormValue(task: Task): TaskFormValue {
     startTime: start ? formatClock(start) : '',
     durationChoice: minutes === null ? 'none' : preset ? String(minutes) : 'custom',
     customMinutes: minutes !== null && !preset ? minutes : null,
-    dueDate: task.dueDate ? new Date(task.dueDate) : null,
   };
 }
 
@@ -87,14 +71,10 @@ export function resolveStart(value: Pick<TaskFormValue, 'startDate' | 'startTime
 }
 
 /**
- * The picker only deals in days. A task whose due time was set elsewhere (for example through the API) keeps that
- * time as long as the user leaves its day alone; picking a different day means the end of that day.
+ * Trims text, turns an empty description into null (which clears it on the server) and sends moments as UTC instants.
+ * There is no due date to send: the server makes a scheduled task due when its block ends. A task with no start time that
+ * already has a due date from before keeps it, because this form can no longer set it and must not silently erase it.
  */
-export function resolveDue(picked: Date, original: string | null): Date {
-  return original !== null && sameDay(new Date(original), picked) ? new Date(original) : endOfDay(picked);
-}
-
-/** Trims text, turns an empty description into null (which clears it on the server) and sends moments as UTC instants. */
 export function formValueToPayload(value: TaskFormValue, original: Task | null = null): TaskPayload {
   const description = value.description.trim();
   const start = resolveStart(value);
@@ -104,7 +84,7 @@ export function formValueToPayload(value: TaskFormValue, original: Task | null =
     priority: value.priority,
     status: value.status,
     startDate: start ? start.toISOString() : null,
-    dueDate: value.dueDate ? resolveDue(value.dueDate, original?.dueDate ?? null).toISOString() : null,
+    dueDate: start ? null : (original?.dueDate ?? null),
     durationMinutes: resolveDuration(value),
   };
 }
@@ -113,10 +93,9 @@ export function formValueToPayload(value: TaskFormValue, original: Task | null =
  * Rules that involve several fields, for instant feedback only (the server enforces the real ones):
  *  - a time needs a day to belong to,
  *  - a custom length must be a whole number of minutes from 1 to 1440,
- *  - the block must end the same day it starts (work is planned inside a day),
- *  - BR-06: the start must not be after the due moment.
+ *  - the block must end the same day it starts (work is planned inside a day).
  */
-export function scheduleValidator(originalDue: () => string | null) {
+export function scheduleValidator() {
   return (group: AbstractControl): ValidationErrors | null => {
     const value = group.getRawValue() as TaskFormValue;
     const errors: ValidationErrors = {};
@@ -138,9 +117,6 @@ export function scheduleValidator(originalDue: () => string | null) {
       errors['crossesMidnight'] = true;
     }
 
-    if (start && value.dueDate && start.getTime() > resolveDue(value.dueDate, originalDue()).getTime()) {
-      errors['dateOrder'] = true;
-    }
     return Object.keys(errors).length ? errors : null;
   };
 }

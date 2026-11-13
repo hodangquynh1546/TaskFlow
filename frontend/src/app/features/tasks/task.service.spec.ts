@@ -138,3 +138,51 @@ describe('TaskService', () => {
     http.expectOne('/api/tasks/..%2Fauth%2Fme');
   });
 });
+
+describe('TaskService.position', () => {
+  it('asks with the same filters and sort as the list, so the answer is about the same list', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const service = TestBed.inject(TaskService);
+    const http = TestBed.inject(HttpTestingController);
+    let result: unknown;
+
+    service.position('t1', { ...DEFAULT_QUERY, status: 'Todo', search: ' báo ', pageSize: 20 }).subscribe((r) => (result = r));
+    const req = http.expectOne((r) => r.url.endsWith('/tasks/t1/position'));
+    req.flush({ page: 2, index: 25 });
+
+    expect(req.request.params.get('status')).toBe('Todo');
+    expect(req.request.params.get('search')).toBe('báo');
+    expect(req.request.params.get('pageSize')).toBe('20');
+    expect(req.request.params.get('sortBy')).toBe('startDate');
+    expect(result).toEqual({ page: 2, index: 25 });
+  });
+});
+
+describe('TaskService.suggestTitles', () => {
+  it('asks for the trimmed text with a small limit', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const service = TestBed.inject(TaskService);
+    const http = TestBed.inject(HttpTestingController);
+    let result: unknown;
+
+    service.suggestTitles('  đã ').subscribe((r) => (result = r));
+    const req = http.expectOne((r) => r.url.endsWith('/tasks/title-suggestions'));
+    req.flush(['đã dạy']);
+
+    expect(req.request.params.get('prefix')).toBe('đã');
+    expect(req.request.params.get('limit')).toBe('8');
+    expect(result).toEqual(['đã dạy']);
+  });
+
+  it('does not call the server for blank text', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const service = TestBed.inject(TaskService);
+    const http = TestBed.inject(HttpTestingController);
+    let result: unknown;
+
+    service.suggestTitles('   ').subscribe((r) => (result = r));
+
+    http.expectNone((r) => r.url.endsWith('/tasks/title-suggestions'));
+    expect(result).toEqual([]);
+  });
+});
