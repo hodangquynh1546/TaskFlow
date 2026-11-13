@@ -22,6 +22,7 @@ function setup({ failAt, tar } = {}) {
     safeStorage: null,
     deps: {
       freePort: (() => { let p = 40000; return async () => p++; })(),
+      stablePort: async () => 40001,
       makePg: () => ({ connectionString: () => 'cs', start: step('pg.start'), stop: step('pg.stop'), child: null }),
       makeApi: () => ({ url: 'http://127.0.0.1:40001', migrate: step('api.migrate'), start: step('api.start'), stop: step('api.stop'), child: null }),
       tar: tar ?? (async (args) => calls.push(`tar ${args[0]}`)),

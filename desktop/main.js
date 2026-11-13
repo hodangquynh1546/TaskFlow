@@ -184,7 +184,14 @@ if (!app.requestSingleInstanceLock()) {
     }
     event.preventDefault();
     quitting = true;
-    runtime.stop().catch(console.error).finally(() => app.exit(0));
+    // exit() skips Chromium's own shutdown, so what the page saved (the sign-in) is written to disk by hand first.
+    runtime
+      .stop()
+      .catch(console.error)
+      .then(() => session.defaultSession.flushStorageData())
+      .then(() => session.defaultSession.cookies.flushStore())
+      .catch(console.error)
+      .finally(() => app.exit(0));
   });
 
   for (const signal of ['SIGINT', 'SIGTERM']) {

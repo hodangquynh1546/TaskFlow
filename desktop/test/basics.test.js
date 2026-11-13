@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { resolvePaths } = require('../src/paths');
-const { freePort } = require('../src/ports');
+const net = require('node:net');
+const { freePort, stablePort } = require('../src/ports');
 const { loadOrCreateSecrets } = require('../src/secrets');
 const { languageFor, translator, MESSAGES } = require('../src/strings');
 const { buildMenuTemplate } = require('../src/menu');
@@ -121,4 +122,42 @@ test('process: stopChild escalates until the child is gone and says whether it h
 
 test('process: tail keeps the last lines for error messages', () => {
   assert.equal(tail('a\nb\nc\n', 2), 'b\nc');
+});
+
+test('ports: the same port is used on every launch, so the browser keeps the sign-in (it is stored per address)', async () => {
+  const file = path.join(tempDir(), 'api-port');
+
+  const first = await stablePort(file);
+  const second = await stablePort(file);
+  const third = await stablePort(file);
+
+  assert.equal(second, first);
+  assert.equal(third, first);
+  assert.equal(fs.readFileSync(file, 'utf8'), String(first));
+});
+
+test('ports: if the remembered port has been taken, a new one is chosen and remembered', async () => {
+  const file = path.join(tempDir(), 'api-port');
+  const first = await stablePort(file);
+  const blocker = net.createServer();
+  await new Promise((resolve) => blocker.listen(first, '127.0.0.1', resolve));
+
+  try {
+    const next = await stablePort(file);
+    assert.notEqual(next, first);
+    assert.equal(fs.readFileSync(file, 'utf8'), String(next));
+  } finally {
+    blocker.close();
+  }
+});
+
+test('ports: a damaged or silly remembered value is ignored', async () => {
+  for (const text of ['', 'abc', '80', '99999', '-5']) {
+    const file = path.join(tempDir(), 'api-port');
+    fs.writeFileSync(file, text);
+
+    const port = await stablePort(file);
+
+    assert.ok(port >= 1024 && port <= 65535, text);
+  }
 });

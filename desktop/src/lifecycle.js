@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const childProcess = require('node:child_process');
-const { freePort } = require('./ports');
+const { freePort, stablePort } = require('./ports');
 const { loadOrCreateSecrets } = require('./secrets');
 const { PostgresServer } = require('./postgres');
 const { ApiServer } = require('./api');
@@ -32,7 +32,7 @@ class TaskFlowRuntime {
     fs.mkdirSync(paths.userData, { recursive: true, mode: 0o700 });
     const secrets = loadOrCreateSecrets({ file: paths.secretsFile, safeStorage: this.safeStorage });
     const pgPort = await (this.deps.freePort ?? freePort)();
-    const apiPort = await (this.deps.freePort ?? freePort)();
+    const apiPort = await (this.deps.stablePort ?? stablePort)(paths.apiPortFile, this.deps.freePort ?? freePort);
 
     const makePg = this.deps.makePg ?? ((options) => new PostgresServer(options));
     const makeApi = this.deps.makeApi ?? ((options) => new ApiServer(options));

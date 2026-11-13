@@ -21,6 +21,7 @@ function resolvePaths({ isPackaged, resourcesPath, devResources, userData }) {
     logsDir: path.join(userData, 'logs'),
     backupsDir: path.join(userData, 'backups'),
     stateFile: path.join(userData, 'state.json'),
+    apiPortFile: path.join(userData, 'api-port'),
   };
 }
 
