@@ -20,6 +20,8 @@ Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cầ
 | PUT | /api/users/profile | có | 200 `UserDto` | Cập nhật hồ sơ |
 | GET | /api/tasks | có | 200 `PagedResult<TaskDto>` | Danh sách, lọc, sắp xếp, phân trang |
 | GET | /api/tasks/{id} | có | 200 `TaskDto` | Chi tiết |
+| GET | /api/tasks/title-suggestions | có | 200 `string[]` | Tiêu đề đã dùng bắt đầu bằng `prefix` (không phân biệt hoa thường, phân biệt dấu), dùng nhiều nhất trước; `limit` 1..20, mặc định 8; `prefix` rỗng thì trả `[]` |
+| GET | /api/tasks/{id}/position | có | 200 `{ page, index }`, 400, 404 | Việc nằm ở đâu trong danh sách với cùng bộ lọc và sắp xếp như `GET /api/tasks` (cùng tham số query); 404 nếu không có hoặc bị bộ lọc ẩn |
 | POST | /api/tasks | có | 201 `TaskDto` + `Location` | Tạo |
 | PUT | /api/tasks/{id} | có | 200 `TaskDto` | Cập nhật toàn bộ |
 | PATCH | /api/tasks/{id}/status | có | 200 `TaskDto` | Đổi trạng thái |
@@ -67,8 +69,8 @@ Xác thực: header `Authorization: Bearer <accessToken>`. Cột **Auth** = cầ
 | login | `{ email, password }` | không để trống |
 | change-password | `{ currentPassword, newPassword }` | AC-03, AC-05 |
 | PUT profile | `{ fullName, email, currentPassword? }` | `currentPassword` bắt buộc khi email đổi (AC-06) |
-| POST tasks | `{ title, description?, priority?, status?, startDate?, durationMinutes?, dueDate? }` | BR-02..BR-07, BR-13 (`durationMinutes` 1..1440, ngoài khoảng → 400 `errors.durationMinutes`); vắng `priority`/`status` thì dùng mặc định. Ngày quá khứ được phép. Mô tả toàn khoảng trắng được lưu thành null; tiêu đề được cắt khoảng trắng đầu cuối |
-| PUT tasks/{id} | `{ title, description?, priority, status, startDate?, dueDate? }` | Thay toàn bộ; `description`, `startDate`, `durationMinutes`, `dueDate` null hoặc vắng thì xóa giá trị (gửi lại `durationMinutes` nếu muốn giữ). `priority` và `status` **bắt buộc** (thiếu thì 400, không âm thầm thành Low/Todo) |
+| POST tasks | `{ title, description?, priority?, status?, startDate?, durationMinutes?, dueDate? }` | BR-02..BR-07, BR-13 (`durationMinutes` 1..1440, ngoài khoảng → 400 `errors.durationMinutes`); vắng `priority`/`status` thì dùng mặc định. Ngày quá khứ được phép. **Hạn hoàn thành do máy chủ tự tính:** có `startDate` thì `dueDate` = `startDate` + `durationMinutes` (không có thời lượng thì bằng chính `startDate`) và `dueDate` gửi lên bị bỏ qua; không có `startDate` thì `dueDate` (nếu client cũ còn gửi) được giữ nguyên. Mô tả toàn khoảng trắng được lưu thành null; tiêu đề được cắt khoảng trắng đầu cuối |
+| PUT tasks/{id} (cùng quy tắc hạn như POST) | `{ title, description?, priority, status, startDate?, dueDate? }` | Thay toàn bộ; `description`, `startDate`, `durationMinutes`, `dueDate` null hoặc vắng thì xóa giá trị (gửi lại `durationMinutes` nếu muốn giữ). `priority` và `status` **bắt buộc** (thiếu thì 400, không âm thầm thành Low/Todo) |
 | PATCH status | `{ status }` | BR-07 |
 
 Trường lạ trong body (ví dụ `userId`, `id`, `createdAt`) bị bỏ qua, không bao giờ được ghi.

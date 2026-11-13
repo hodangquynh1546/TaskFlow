@@ -21,7 +21,14 @@ Kiểm tra ngày 2026-11-12.
 - [x] Refresh token xoay vòng (ADR-20): 17 test tích hợp (xoay, hết hạn, phát hiện dùng lại, đăng xuất, đổi mật khẩu, xóa tài khoản) và test interceptor; đã thử trên bản thật với access token hết hạn: tải lại vẫn ở đúng trang
 - [x] Ứng dụng Mac vẫn còn đăng nhập sau khi thoát (Cmd+Q) và mở lại: lỗi do cổng API ngẫu nhiên mỗi lần chạy (đăng nhập lưu theo địa chỉ); đã cố định cổng và kiểm bằng cách mở, thoát, mở lại hai lần
 - [x] Điện thoại: thanh tab dưới không còn bị trang đang chuyển che khuất khi đổi mục (lỗi View Transitions)
-- [x] Tạo hoặc hủy việc xong thì quay về trang trước đó (tổng quan, lịch ngày đúng ngày đang xem, danh sách đã lọc), không vào chi tiết việc; mở thẳng form thì về danh sách
+- [x] Tạo việc xong thì mở danh sách Công việc đúng trang chứa việc mới, cuộn tới và nháy sáng (`GET /api/tasks/{id}/position`); giữ sắp xếp và bộ lọc của danh sách trước đó, bộ lọc nào ẩn mất việc mới thì bỏ; Hủy quay về trang trước
+- [x] Hạn hoàn thành không còn nhập tay: máy chủ tự tính từ giờ bắt đầu + thời lượng (11 test), form bỏ ô hạn và hiện "Kết thúc và đến hạn lúc …"; gợi ý tiêu đề theo tiền tố từ các tiêu đề đã dùng (9 test tích hợp, kiểm "đ" ra đã dạy/động/đen, "đã" chỉ còn đã dạy); khung giờ trong danh sách có màu theo trạng thái
+- [ ] Mục "Đến hạn trong ngày, chưa xếp giờ" ở Lịch ngày hầu như luôn trống vì việc mới có hạn thì luôn có giờ bắt đầu; chưa gỡ, chờ quyết định
+- [x] Khung ứng dụng vừa khít cửa sổ: menu trái, thanh tiêu đề (avatar) cố định, trang không cuộn; chỉ vùng `.content` (hoặc vùng cuộn riêng của từng trang) cuộn, nên macOS nảy khi cuộn quá đầu/cuối không còn kéo menu theo; Tổng quan cũng cố định tiêu đề; đổi màn hình thì nội dung về đầu trang
+- [x] Lưu việc (tạo hoặc sửa) quay về đúng nơi đang duyệt, kể cả khi đi qua trang chi tiết: từ Lịch ngày thì về Lịch ngày, đúng ngày việc bắt đầu, cuộn tới và nháy khối của việc; từ danh sách thì về danh sách với đúng bộ lọc và sắp xếp (bộ lọc luôn được giữ, nếu nó ẩn mất việc thì báo lý do); từ Tổng quan hoặc Hồ sơ thì về danh sách Công việc không lọc (`BrowseMemory`)
+- [x] Danh sách Công việc là hai hộp: bộ lọc (và tiêu đề) đứng yên, hộp danh sách có dòng đếm và phân trang cố định, chỉ các thẻ cuộn bên trong; hai thẻ mỗi hàng từ 1100 px, một thẻ mỗi hàng ở màn nhỏ (theo thứ tự đọc)
+- [x] Trang tạo và sửa việc: nút quay lại và tiêu đề cố định, khung form (viền, bóng, nút Hủy/Lưu) đứng yên, chỉ các ô cuộn bên trong khung; trang không cuộn, kể cả trên điện thoại; lưu việc đã sửa thì về danh sách đúng vị trí của nó
+- [x] Lịch ngày hôm nay mở với giờ hiện tại ở dòng đầu; danh sách việc bỏ biểu tượng mức ưu tiên
 - [x] Việc hoàn thành luôn xuống cuối danh sách, kể cả khi phân trang
 - [x] Biểu đồ năm: backend trả `"Year"` nhưng giao diện so với `'year'` nên nhãn tháng bị sai; đã sửa và nhãn dài ("Tháng 11") rút thành "T11"
 - [x] Menu thao tác ở hàng việc mở lên trên khi gần thanh tab dưới (điện thoại)
