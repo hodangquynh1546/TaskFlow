@@ -2,13 +2,15 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.OpenApi;
 using TaskManagement.API.Extensions;
+using TaskManagement.API.Hosting;
 using TaskManagement.API.Middleware;
 using TaskManagement.API.Services;
 using TaskManagement.Application;
 using TaskManagement.Application.Abstractions;
 using TaskManagement.Infrastructure;
 
-var builder = WebApplication.CreateBuilder(args);
+var migrateOnly = StartupMode.IsMigrateOnly(args);
+var builder = WebApplication.CreateBuilder(StartupMode.WithoutCommand(args));
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -63,10 +65,20 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+if (migrateOnly)
+{
+    await DatabaseMigrator.MigrateAsync(app.Services);
+    return;
+}
+
 app.UseConfiguredForwardedHeaders();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseConfiguredSpaFiles();
+
+// Explicit so the static files above run before an endpoint is chosen (see UseConfiguredSpaFiles).
+app.UseRouting();
 
 if (app.Environment.IsDevelopment())
 {
@@ -81,6 +93,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous();
+app.MapConfiguredSpaFallback();
 
 app.Run();
 

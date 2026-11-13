@@ -33,3 +33,9 @@ npm-debug.log*
 
 # Browser-automation scratch output
 .playwright-mcp/
+
+# Desktop app (Electron): installed packages, the bundle assembled by the build, build output and download cache
+desktop/node_modules/
+desktop/resources/
+desktop/dist/
+desktop/.cache/

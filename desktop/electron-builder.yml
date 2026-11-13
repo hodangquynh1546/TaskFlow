@@ -1,0 +1,32 @@
+appId: com.taskflow.desktop
+productName: TaskFlow
+copyright: TaskFlow
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.js
+  - loading.html
+  - package.json
+  - src/**/*
+asar: true
+# The API, the web build and PostgreSQL stay as plain files (executables cannot run from inside an asar archive).
+extraResources:
+  - from: resources/api
+    to: api
+  - from: resources/web
+    to: web
+  - from: resources/postgres
+    to: postgres
+mac:
+  target:
+    - target: dir
+      arch: [arm64]
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  # Built and used on the same Mac: no Developer ID. scripts/build.sh signs the finished app ad hoc, which is all
+  # Apple Silicon requires to run it. Sharing the app with others would need a Developer ID and notarisation.
+  identity: null
+  hardenedRuntime: false
+  extendInfo:
+    LSApplicationCategoryType: public.app-category.productivity

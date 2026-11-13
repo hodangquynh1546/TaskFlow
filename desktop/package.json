@@ -1,0 +1,16 @@
+{
+  "name": "taskflow-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TaskFlow as a self-contained macOS app: Electron shell, bundled API and embedded PostgreSQL.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\"",
+    "build": "bash scripts/build.sh"
+  },
+  "devDependencies": {
+    "electron": "^45.3.1",
+    "electron-builder": "^26.18.0"
+  }
+}
