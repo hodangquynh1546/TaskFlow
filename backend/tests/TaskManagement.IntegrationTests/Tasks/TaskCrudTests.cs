@@ -49,11 +49,11 @@ public sealed class TaskCrudTests : IDisposable
     {
         var user = await _api.RegisterAsync();
         var start = new DateTimeOffset(2030, 5, 1, 8, 0, 0, TimeSpan.Zero);
-        var due = new DateTimeOffset(2030, 5, 9, 17, 30, 0, TimeSpan.Zero);
+        var due = start.AddMinutes(90);
 
         var created = await user.CreateTaskAsync(new
         {
-            title = "Đầy đủ", description = "Dòng 1\nDòng 2", priority = "High", status = "InProgress", startDate = start, dueDate = due,
+            title = "Đầy đủ", description = "Dòng 1\nDòng 2", priority = "High", status = "InProgress", startDate = start, durationMinutes = 90,
         });
 
         var fetched = await user.GetJsonAsync($"/api/tasks/{created.GetProperty("id").GetGuid()}");
@@ -63,6 +63,69 @@ public sealed class TaskCrudTests : IDisposable
         Assert.Equal("InProgress", fetched.GetProperty("status").GetString());
         Assert.Equal(start, fetched.GetProperty("startDate").GetDateTimeOffset());
         Assert.Equal(due, fetched.GetProperty("dueDate").GetDateTimeOffset());
+    }
+
+    // --- The due date follows the start time ----------------------------------------------------
+
+    [Fact]
+    public async Task A_scheduled_task_is_due_when_its_block_ends()
+    {
+        var user = await _api.RegisterAsync();
+        var start = new DateTimeOffset(2030, 5, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var withLength = await user.CreateTaskAsync(new { title = "Có thời lượng", startDate = start, durationMinutes = 90 });
+        var withoutLength = await user.CreateTaskAsync(new { title = "Không thời lượng", startDate = start });
+
+        Assert.Equal(start.AddMinutes(90), withLength.GetProperty("dueDate").GetDateTimeOffset());
+        Assert.Equal(start, withoutLength.GetProperty("dueDate").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task A_due_date_sent_with_a_start_time_is_ignored_because_the_server_decides_it()
+    {
+        var user = await _api.RegisterAsync();
+        var start = new DateTimeOffset(2030, 5, 1, 8, 0, 0, TimeSpan.Zero);
+
+        var task = await user.CreateTaskAsync(new { title = "Cố đặt hạn", startDate = start, durationMinutes = 60, dueDate = start.AddDays(30) });
+
+        Assert.Equal(start.AddMinutes(60), task.GetProperty("dueDate").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task A_task_with_no_start_time_keeps_a_due_date_from_an_older_client()
+    {
+        var user = await _api.RegisterAsync();
+        var due = new DateTimeOffset(2030, 5, 9, 17, 30, 0, TimeSpan.Zero);
+
+        var task = await user.CreateTaskAsync(new { title = "Chỉ có hạn", dueDate = due });
+
+        Assert.Equal(due, task.GetProperty("dueDate").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task Rescheduling_moves_the_due_date_with_it_and_removing_the_start_removes_it()
+    {
+        var user = await _api.RegisterAsync();
+        var start = new DateTimeOffset(2030, 5, 1, 8, 0, 0, TimeSpan.Zero);
+        var created = await user.CreateTaskAsync(new { title = "Dời lịch", startDate = start, durationMinutes = 60 });
+        var url = $"/api/tasks/{created.GetProperty("id").GetGuid()}";
+
+        var later = await (await user.Client.PutAsJsonAsync(url, new { title = "Dời lịch", priority = "Medium", status = "Todo", startDate = start.AddDays(2), durationMinutes = 120 })).JsonAsync();
+        Assert.Equal(start.AddDays(2).AddMinutes(120), later.GetProperty("dueDate").GetDateTimeOffset());
+
+        var unscheduled = await (await user.Client.PutAsJsonAsync(url, new { title = "Dời lịch", priority = "Medium", status = "Todo", startDate = (DateTimeOffset?)null, durationMinutes = 120 })).JsonAsync();
+        Assert.Equal(JsonValueKind.Null, unscheduled.GetProperty("dueDate").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_scheduled_task_becomes_overdue_once_its_block_has_ended()
+    {
+        var user = await _api.RegisterAsync();
+        var ended = DateTimeOffset.UtcNow.AddHours(-3);
+
+        var task = await user.CreateTaskAsync(new { title = "Đã qua giờ", startDate = ended, durationMinutes = 60 });
+
+        Assert.True(task.GetProperty("isOverdue").GetBoolean());
     }
 
     [Fact]
@@ -143,7 +206,6 @@ public sealed class TaskCrudTests : IDisposable
     [InlineData("""{ "title": "" }""", "title")]
     [InlineData("""{ "title": "   " }""", "title")]
     [InlineData("""{ "title": "ok", "description": "@@LONG@@" }""", "description")]
-    [InlineData("""{ "title": "ok", "startDate": "2030-01-02T00:00:00Z", "dueDate": "2030-01-01T00:00:00Z" }""", "startDate")]
     [InlineData("""{ "title": "ok", "status": "Finished" }""", "status")]
     [InlineData("""{ "title": "ok", "status": 1 }""", "status")]
     [InlineData("""{ "title": "ok", "priority": "Urgent" }""", "priority")]
@@ -213,11 +275,12 @@ public sealed class TaskCrudTests : IDisposable
         var user = await _api.RegisterAsync();
         var original = await user.CreateTaskAsync(new { title = "Cũ", description = "mô tả cũ", priority = "Low", dueDate = DateTimeOffset.UtcNow.AddDays(3) });
         var id = original.GetProperty("id").GetGuid();
-        var newDue = new DateTimeOffset(2031, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var newStart = new DateTimeOffset(2031, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var newDue = newStart.AddMinutes(45);
 
         var response = await user.Client.PutAsJsonAsync($"/api/tasks/{id}", new
         {
-            title = "Mới", description = "mô tả mới", priority = "High", status = "InProgress", startDate = newDue.AddDays(-1), dueDate = newDue,
+            title = "Mới", description = "mô tả mới", priority = "High", status = "InProgress", startDate = newStart, durationMinutes = 45,
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -239,7 +302,7 @@ public sealed class TaskCrudTests : IDisposable
         var user = await _api.RegisterAsync();
         var original = await user.CreateTaskAsync(new
         {
-            title = "Có đủ", description = "mô tả", startDate = DateTimeOffset.UtcNow, dueDate = DateTimeOffset.UtcNow.AddDays(1),
+            title = "Có đủ", description = "mô tả", startDate = DateTimeOffset.UtcNow, durationMinutes = 30,
         });
 
         var response = await user.Client.PutAsJsonAsync($"/api/tasks/{original.GetProperty("id").GetGuid()}", new
@@ -257,7 +320,6 @@ public sealed class TaskCrudTests : IDisposable
     [InlineData("""{ "title": "x", "status": "Todo" }""", "priority")]            // missing priority must NOT silently become Low
     [InlineData("""{ "title": "x", "priority": "High" }""", "status")]            // missing status must NOT silently become Todo
     [InlineData("""{ "title": " ", "priority": "High", "status": "Todo" }""", "title")]
-    [InlineData("""{ "title": "x", "priority": "High", "status": "Todo", "startDate": "2030-01-02T00:00:00Z", "dueDate": "2030-01-01T00:00:00Z" }""", "startDate")]
     [InlineData("""{ "title": "x", "priority": "Nope", "status": "Todo" }""", "priority")]
     public async Task Invalid_put_is_400_and_leaves_the_task_untouched(string json, string field)
     {

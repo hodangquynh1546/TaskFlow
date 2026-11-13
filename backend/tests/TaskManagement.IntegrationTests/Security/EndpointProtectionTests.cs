@@ -38,6 +38,8 @@ public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposa
                 "GET api/dashboard/upcoming-tasks",
                 "GET api/tasks",
                 "GET api/tasks/{id:guid}",
+                "GET api/tasks/{id:guid}/position",
+                "GET api/tasks/title-suggestions",
                 "GET api/users/profile",
                 "PATCH api/tasks/{id:guid}/status",
                 "POST api/auth/change-password",
@@ -68,7 +70,7 @@ public sealed class EndpointProtectionTests(PostgresFixture postgres) : IDisposa
     {
         using var client = _factory.CreateClient();
         var protectedEndpoints = ApiEndpoints().Where(e => !PublicEndpoints.Contains($"{e.Method} {e.Pattern}")).ToList();
-        Assert.Equal(14, protectedEndpoints.Count);
+        Assert.Equal(16, protectedEndpoints.Count);
 
         foreach (var (method, pattern, _) in protectedEndpoints)
         {

@@ -13,6 +13,12 @@ public interface ITaskService
 
     Task<TaskDto> GetAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>Where a task sits in the list for this filter and sort, so the client can open the page that holds it.</summary>
+    Task<TaskPositionDto> GetPositionAsync(Guid id, TaskQuery query, CancellationToken cancellationToken);
+
+    /// <summary>Titles the user has used before that start with the typed text, most used first, for the title box to offer.</summary>
+    Task<IReadOnlyList<string>> SuggestTitlesAsync(TitleSuggestionsQuery query, CancellationToken cancellationToken);
+
     Task<TaskDto> CreateAsync(CreateTaskRequest request, CancellationToken cancellationToken);
 
     Task<TaskDto> UpdateAsync(Guid id, UpdateTaskRequest request, CancellationToken cancellationToken);
@@ -29,7 +35,8 @@ internal sealed class TaskService(
     IValidator<CreateTaskRequest> createValidator,
     IValidator<UpdateTaskRequest> updateValidator,
     IValidator<ChangeStatusRequest> statusValidator,
-    IValidator<TaskQuery> queryValidator) : ITaskService
+    IValidator<TaskQuery> queryValidator,
+    IValidator<TitleSuggestionsQuery> suggestionsValidator) : ITaskService
 {
     public async Task<PagedResult<TaskDto>> ListAsync(TaskQuery query, CancellationToken cancellationToken)
     {
@@ -52,6 +59,49 @@ internal sealed class TaskService(
         return new PagedResult<TaskDto>(tasks.ConvertAll(t => TaskDto.From(t, now)), query.Page, query.PageSize, total);
     }
 
+    public async Task<IReadOnlyList<string>> SuggestTitlesAsync(TitleSuggestionsQuery query, CancellationToken cancellationToken)
+    {
+        await suggestionsValidator.ValidateAndThrowAsync(query, cancellationToken);
+
+        var term = (query.Prefix ?? string.Empty).Trim().ToLowerInvariant();
+        if (term.Length == 0)
+        {
+            return [];
+        }
+
+        // As in ApplyFilters, only the parameterless ToLower() and the plain StartsWith(string) translate. StartsWith becomes a
+        // LIKE with the text escaped, so '%' and '_' typed by the user match themselves.
+#pragma warning disable CA1304, CA1311, CA1862
+        var used = await OwnTasks().AsNoTracking()
+            .Where(t => t.Title.ToLower().StartsWith(term))
+            .GroupBy(t => t.Title)
+            .Select(g => new { Title = g.Key, Uses = g.Count(), Last = g.Max(t => t.CreatedAt) })
+            .OrderByDescending(x => x.Uses).ThenByDescending(x => x.Last).ThenBy(x => x.Title)
+            .Take(TitleSuggestionsQuery.MaxLimit * 3)
+            .ToListAsync(cancellationToken);
+#pragma warning restore CA1304, CA1311, CA1862
+
+        // "Đã dạy" and "đã dạy" are one suggestion: the more used spelling wins.
+        return used.GroupBy(x => x.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First().Title)
+            .Take(query.Limit)
+            .ToList();
+    }
+
+    public async Task<TaskPositionDto> GetPositionAsync(Guid id, TaskQuery query, CancellationToken cancellationToken)
+    {
+        await queryValidator.ValidateAndThrowAsync(query, cancellationToken);
+
+        // Only ids are read, which keeps this cheap for one person's tasks; the order is exactly the list's order.
+        var ids = await ApplySort(ApplyFilters(OwnTasks().AsNoTracking(), query, clock.GetUtcNow()), query)
+            .Select(t => t.Id)
+            .ToListAsync(cancellationToken);
+
+        var index = ids.IndexOf(id);
+        // Missing, someone else's, or hidden by the filters: all the same answer (BR-10).
+        return index < 0 ? throw NotFound() : new TaskPositionDto(index / query.PageSize + 1, index);
+    }
+
     public async Task<TaskDto> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var task = await OwnTasks().AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
@@ -65,7 +115,7 @@ internal sealed class TaskService(
 
         var now = clock.GetUtcNow();
         // The owner always comes from the token (BR-01); there is no UserId on the request to trust.
-        var task = TaskItem.Create(currentUser.UserId, request.Title, request.Description, request.Priority, request.Status, request.StartDate, request.DueDate, now, request.DurationMinutes);
+        var task = TaskItem.Create(currentUser.UserId, request.Title, request.Description, request.Priority, request.Status, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes);
         db.Tasks.Add(task);
         await db.SaveChangesAsync(cancellationToken);
         return TaskDto.From(task, now);
@@ -77,7 +127,7 @@ internal sealed class TaskService(
 
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         var now = clock.GetUtcNow();
-        task.Update(request.Title, request.Description, request.Priority!.Value, request.Status!.Value, request.StartDate, request.DueDate, now, request.DurationMinutes);
+        task.Update(request.Title, request.Description, request.Priority!.Value, request.Status!.Value, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes);
         await db.SaveChangesAsync(cancellationToken);
         return TaskDto.From(task, now);
     }

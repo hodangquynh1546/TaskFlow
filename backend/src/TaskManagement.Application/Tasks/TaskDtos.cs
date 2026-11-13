@@ -31,7 +31,12 @@ public sealed record TaskDto(
         task.UpdatedAt);
 }
 
-/// <summary>Status and priority are optional on create and fall back to Todo / Medium (BR-04, BR-05).</summary>
+/// <summary>
+/// Status and priority are optional on create and fall back to Todo / Medium (BR-04, BR-05).
+/// The due date is no longer entered by hand: with a start time, the task is due when its block of time ends (start plus
+/// duration, or the start itself without a duration). <c>DueDate</c> is only honoured for a task with no start time, which
+/// keeps older clients and older tasks working.
+/// </summary>
 public sealed record CreateTaskRequest(
     string Title,
     string? Description,
@@ -68,6 +73,17 @@ public enum SortDirection
 {
     Asc,
     Desc,
+}
+
+/// <summary>Zero-based <see cref="Index"/> in the filtered, sorted list, and the 1-based <see cref="Page"/> it falls on for the query's page size.</summary>
+public sealed record TaskPositionDto(int Page, int Index);
+
+public sealed class TitleSuggestionsQuery
+{
+    public const int MaxLimit = 20;
+
+    public string? Prefix { get; set; }
+    public int Limit { get; set; } = 8;
 }
 
 public sealed class TaskQuery

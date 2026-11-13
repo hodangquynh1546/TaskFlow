@@ -14,11 +14,24 @@ public sealed class TasksController(ITaskService tasks) : ControllerBase
     public async Task<ActionResult<PagedResult<TaskDto>>> List([FromQuery] TaskQuery query, CancellationToken cancellationToken) =>
         await tasks.ListAsync(query, cancellationToken);
 
+    [HttpGet("title-suggestions")]
+    [ProducesResponseType<IReadOnlyList<string>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyList<string>>> TitleSuggestions([FromQuery] TitleSuggestionsQuery query, CancellationToken cancellationToken) =>
+        Ok(await tasks.SuggestTitlesAsync(query, cancellationToken));
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType<TaskDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TaskDto>> Get(Guid id, CancellationToken cancellationToken) =>
         await tasks.GetAsync(id, cancellationToken);
+
+    [HttpGet("{id:guid}/position")]
+    [ProducesResponseType<TaskPositionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TaskPositionDto>> Position(Guid id, [FromQuery] TaskQuery query, CancellationToken cancellationToken) =>
+        await tasks.GetPositionAsync(id, query, cancellationToken);
 
     [HttpPost]
     [ProducesResponseType<TaskDto>(StatusCodes.Status201Created)]

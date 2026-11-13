@@ -26,9 +26,6 @@ public sealed class CreateTaskRequestValidator : AbstractValidator<CreateTaskReq
         RuleFor(x => x.DurationMinutes).ValidDuration().When(x => x.DurationMinutes.HasValue);
         RuleFor(x => x.Priority).IsInEnum().When(x => x.Priority.HasValue).WithMessage("Mức ưu tiên không hợp lệ.");
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status.HasValue).WithMessage("Trạng thái không hợp lệ.");
-        RuleFor(x => x.StartDate).Must((x, start) => start!.Value <= x.DueDate!.Value)
-            .When(x => x.StartDate.HasValue && x.DueDate.HasValue)
-            .WithMessage("Ngày bắt đầu không được sau hạn hoàn thành.");
     }
 }
 
@@ -43,9 +40,15 @@ public sealed class UpdateTaskRequestValidator : AbstractValidator<UpdateTaskReq
             .IsInEnum().WithMessage("Mức ưu tiên không hợp lệ.");
         RuleFor(x => x.Status).NotNull().WithMessage("Trạng thái là bắt buộc.")
             .IsInEnum().WithMessage("Trạng thái không hợp lệ.");
-        RuleFor(x => x.StartDate).Must((x, start) => start!.Value <= x.DueDate!.Value)
-            .When(x => x.StartDate.HasValue && x.DueDate.HasValue)
-            .WithMessage("Ngày bắt đầu không được sau hạn hoàn thành.");
+    }
+}
+
+public sealed class TitleSuggestionsQueryValidator : AbstractValidator<TitleSuggestionsQuery>
+{
+    public TitleSuggestionsQueryValidator()
+    {
+        RuleFor(x => x.Prefix).MaximumLength(TaskItem.TitleMaxLength).WithMessage($"Tiêu đề tối đa {TaskItem.TitleMaxLength} ký tự.");
+        RuleFor(x => x.Limit).InclusiveBetween(1, TitleSuggestionsQuery.MaxLimit).WithMessage($"Số mục phải từ 1 đến {TitleSuggestionsQuery.MaxLimit}.");
     }
 }
 

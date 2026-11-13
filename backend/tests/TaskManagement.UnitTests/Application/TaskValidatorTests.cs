@@ -70,9 +70,9 @@ public class TaskValidatorTests
     }
 
     [Fact]
-    public void Start_after_due_is_rejected_and_equal_or_partial_dates_are_fine()
+    public void Any_combination_of_start_and_due_is_valid_because_the_due_date_is_derived_from_the_start()
     {
-        ValidationAssert.InvalidOn(_create, Create(start: T0.AddSeconds(1), due: T0), "StartDate");
+        ValidationAssert.Valid(_create, Create(start: T0.AddSeconds(1), due: T0));
         ValidationAssert.Valid(_create, Create(start: T0, due: T0));
         ValidationAssert.Valid(_create, Create(start: T0));
         ValidationAssert.Valid(_create, Create(due: T0));
@@ -143,11 +143,10 @@ public class TaskValidatorTests
     }
 
     [Fact]
-    public void Update_applies_the_same_title_description_and_date_rules()
+    public void Update_applies_the_same_title_and_description_rules()
     {
         ValidationAssert.InvalidOn(_update, Update(title: " "), "Title");
         ValidationAssert.InvalidOn(_update, Update(description: new string('d', 5001)), "Description");
-        ValidationAssert.InvalidOn(_update, Update(start: T0.AddDays(1), due: T0), "StartDate");
         ValidationAssert.InvalidOn(_update, Update(priority: (TaskPriority)5), "Priority");
         ValidationAssert.InvalidOn(_update, Update(status: (TaskItemStatus)5), "Status");
     }
