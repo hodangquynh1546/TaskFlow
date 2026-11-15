@@ -118,14 +118,10 @@ export class ScheduleComponent {
    * scrolling. Any other day: an hour before the first task. In pixels of scroll, counting the timeline's top margin.
    */
   protected readonly focusTop = computed(() => {
-    const { startHour, endHour, blocks } = this.layout();
+    const { blocks } = this.layout();
     if (this.isToday()) {
-      const hour = this.now().getHours();
-      if (hour < startHour) {
-        return 0;
-      }
-      // Past the last drawn hour the scroll simply stops at the end of the day.
-      return hour >= endHour ? this.gridHeight() : Math.max(0, TIMELINE_MARGIN_TOP + this.hourTop(hour) - HOUR_LABEL_ROOM);
+      // The axis is the whole day, so the current hour is always on it. Near midnight the scroll simply stops at the end.
+      return Math.max(0, TIMELINE_MARGIN_TOP + this.hourTop(this.now().getHours()) - HOUR_LABEL_ROOM);
     }
     const first = blocks.length ? Math.min(...blocks.map((b) => this.top(b))) : null;
     return first === null ? 0 : Math.max(0, TIMELINE_MARGIN_TOP + first - 60 * PX_PER_MINUTE);
@@ -159,7 +155,7 @@ export class ScheduleComponent {
         this.state.set('ready');
       });
 
-    // Opens on the part of the day that matters instead of at 06:00. Runs when a day's data arrives, not on every
+    // Opens on the part of the day that matters instead of at midnight. Runs when a day's data arrives, not on every
     // minute tick: reading the target untracked keeps the clock from yanking the scroll away from the user.
     effect(() => {
       if (this.state() !== 'ready') {

@@ -90,8 +90,8 @@ describe('ScheduleComponent', () => {
       const { el } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
       const [a] = blocks(el);
 
-      // 06:00 is the top of the default window, so 09:00 is 180 minutes down.
-      expect(a.style.top).toBe(`${180 * PX_PER_MINUTE}px`);
+      // 00:00 is the top of the axis, so 09:00 is 540 minutes down.
+      expect(a.style.top).toBe(`${540 * PX_PER_MINUTE}px`);
       expect(a.style.height).toBe(`${60 * PX_PER_MINUTE}px`);
       expect(a.style.left).toBe('0%');
       expect(a.style.width).toBe('100%');
@@ -149,19 +149,20 @@ describe('ScheduleComponent', () => {
       expect(blocks(el)[0].getAttribute('aria-label')).toContain('chưa có thời lượng');
     });
 
-    it('stretches the hours to show an early task', async () => {
-      const { el } = await setup(undefined, of(paged([block('a', 4, 0, 60)])));
+    it('shows an early or a late task without stretching: the axis is already the whole day', async () => {
+      const { el } = await setup(undefined, of(paged([block('a', 4, 0, 60), block('b', 23, 0, 60)])));
 
-      expect(el.querySelector('.hour__label')!.textContent).toBe('04:00');
+      expect(el.querySelector('.hour__label')!.textContent).toBe('00:00');
+      expect(el.querySelectorAll('.hour__label')).toHaveLength(24);
     });
 
-    it('labels every hour of the default window', async () => {
+    it('labels every hour of the day, 00:00 to 23:00', async () => {
       const { el } = await setup();
 
       const labels = [...el.querySelectorAll('.hour__label')].map((l) => l.textContent);
-      expect(labels[0]).toBe('06:00');
-      expect(labels.at(-1)).toBe('21:00');
-      expect(labels).toHaveLength(16);
+      expect(labels[0]).toBe('00:00');
+      expect(labels.at(-1)).toBe('23:00');
+      expect(labels).toHaveLength(24);
     });
   });
 
@@ -295,7 +296,7 @@ describe('ScheduleComponent', () => {
       vi.setSystemTime(new Date(2026, 10, 12, 10, 30));
 
       const today = await setup('/schedule?date=2026-11-12');
-      expect((today.el.querySelector<HTMLElement>('.now'))!.style.top).toBe(`${(10 * 60 + 30 - 6 * 60) * PX_PER_MINUTE}px`);
+      expect((today.el.querySelector<HTMLElement>('.now'))!.style.top).toBe(`${(10 * 60 + 30) * PX_PER_MINUTE}px`);
       expect(today.el.querySelector('.now')!.getAttribute('aria-hidden')).toBe('true');
       TestBed.resetTestingModule();
 
@@ -303,13 +304,13 @@ describe('ScheduleComponent', () => {
       expect(other.el.querySelector('.now')).toBeNull();
     });
 
-    it('is not drawn when the time is outside the visible hours', async () => {
+    it('is drawn at any hour of the day, including late at night', async () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date(2026, 10, 12, 23, 0));
 
       const { el } = await setup('/schedule?date=2026-11-12');
 
-      expect(el.querySelector('.now')).toBeNull();
+      expect((el.querySelector<HTMLElement>('.now'))!.style.top).toBe(`${23 * 60 * PX_PER_MINUTE}px`);
     });
   });
 
@@ -354,8 +355,8 @@ describe('ScheduleComponent', () => {
   });
 
   describe('where the timeline opens', () => {
-    // 06:00 is the first line, 84 px per hour, 16 px of margin above it and 14 px for the label that sticks out.
-    const opensAt = (hour: number) => 16 + (hour - 6) * 84 - 14;
+    // 00:00 is the first line, 84 px per hour, 16 px of margin above it and 14 px for the label that sticks out.
+    const opensAt = (hour: number) => 16 + hour * 84 - 14;
 
     it('today: the current hour is the first line, so nothing needs scrolling up to', async () => {
       vi.setSystemTime(new Date(2026, 10, 20, 13, 20));
@@ -364,21 +365,21 @@ describe('ScheduleComponent', () => {
       expect(harness.component['focusTop']()).toBe(opensAt(13));
     });
 
-    it('today before the first drawn hour opens at the top, and after the last at the bottom of the day', async () => {
-      vi.setSystemTime(new Date(2026, 10, 20, 3, 0));
+    it('shortly after midnight the day opens at its very top, and late in the evening at that hour', async () => {
+      vi.setSystemTime(new Date(2026, 10, 20, 0, 10));
       const early = await setupWithComponent('/schedule?date=2026-11-20');
-      expect(early.harness.component['focusTop']()).toBe(0);
+      expect(early.harness.component['focusTop']()).toBe(opensAt(0));
 
       TestBed.resetTestingModule();
       vi.setSystemTime(new Date(2026, 10, 20, 23, 30));
       const late = await setupWithComponent('/schedule?date=2026-11-20');
-      expect(late.harness.component['focusTop']()).toBe(late.harness.component['gridHeight']());
+      expect(late.harness.component['focusTop']()).toBeCloseTo(opensAt(23), 5);
     });
 
     it('another day opens an hour before its first task', async () => {
       const { harness } = await setupWithComponent('/schedule?date=2026-11-12', of(paged([block('a', 10, 0, 60)])));
 
-      expect(harness.component['focusTop']()).toBe(16 + (4 * 60 - 60) * PX_PER_MINUTE);
+      expect(harness.component['focusTop']()).toBe(16 + (10 * 60 - 60) * PX_PER_MINUTE);
     });
 
     it('the clock ticking over does not move the timeline under the user', async () => {
@@ -439,8 +440,8 @@ describe('ScheduleComponent', () => {
         await setup(`/schedule?date=${DAY}&highlight=c`, busyDay());
         await vi.waitFor(() => expect(scrolls.length).toBeGreaterThan(0));
 
-        // 20:00 is 14 hours after the axis starts at 06:00; the block is 30 minutes, so its middle is 15 minutes in.
-        const middle = 16 + (14 * 60 + 15) * PX_PER_MINUTE;
+        // 20:00 is 20 hours after the axis starts at 00:00; the block is 30 minutes, so its middle is 15 minutes in.
+        const middle = 16 + (20 * 60 + 15) * PX_PER_MINUTE;
         expect(scrolls.at(-1)).toBeCloseTo(middle - 200, 5);
       } finally {
         delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;

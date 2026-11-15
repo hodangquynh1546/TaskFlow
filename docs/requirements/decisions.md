@@ -52,7 +52,7 @@ Các điểm chưa rõ trong đặc tả ban đầu và quyết định đã đ�
 | 49 | Ngân sách bundle | Cảnh báo 1,2 MB (nâng từ 1,1 MB khi làm giao diện v2: font Baloo 2, bố cục mới), lỗi 1,5 MB (raw). Bundle ban đầu ~1,07 MB, 212 KB khi truyền; phần lớn là Angular, NG-ZORRO, CDK và date-fns cho shell, mã ứng dụng khoảng 15 KB |
 | 50 | Không làm | Cảnh báo "thay đổi chưa lưu" khi rời form; chọn giờ cụ thể cho hạn (xem #44) |
 | 51 | Công việc theo khối giờ (thay đổi yêu cầu, bổ sung #44) | Việc là một khối thời gian trong ngày: giờ bắt đầu + thời lượng theo phút (gợi ý nhanh 15 phút, 30 phút, 1/2/3/4 giờ, hoặc nhập số phút). `StartDate` nay mang cả giờ; hạn hoàn thành (`DueDate`) vẫn chọn theo ngày như #44 |
-| 52 | Trang Lịch ngày | `/schedule?date=`: trục giờ 06:00–22:00 (mở rộng khi có việc ngoài khoảng), việc chồng giờ chia làn cạnh nhau, khối ngắn hơn 15 phút vẽ như 15 phút, có giờ bắt đầu mà chưa có thời lượng thì vẽ 30 phút nét đứt (ước lượng), bấm ô trống để tạo việc điền sẵn ngày và giờ. Việc đến hạn trong ngày nhưng chưa xếp giờ hiện ở danh sách bên cạnh |
+| 52 | Trang Lịch ngày | `/schedule?date=`: trục giờ cả ngày 00:00–24:00 (trước đây 06:00–22:00, đổi theo yêu cầu), việc chồng giờ chia làn cạnh nhau, khối ngắn hơn 15 phút vẽ như 15 phút, có giờ bắt đầu mà chưa có thời lượng thì vẽ 30 phút nét đứt (ước lượng), bấm ô trống để tạo việc điền sẵn ngày và giờ. Việc đến hạn trong ngày nhưng chưa xếp giờ hiện ở danh sách bên cạnh |
 | 53 | Ranh giới ngày | Khối kết thúc đúng 24:00 hợp lệ; vượt qua nửa đêm bị từ chối ở form (không tách khối) |
 
 ## Bổ sung ở Phase 4

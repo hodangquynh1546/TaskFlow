@@ -26,8 +26,9 @@ export interface DayLayout {
   conflicts: number;
 }
 
-export const DEFAULT_START_HOUR = 6;
-export const DEFAULT_END_HOUR = 22;
+/** The whole day, so a task at any hour is on the axis without it stretching. */
+export const DEFAULT_START_HOUR = 0;
+export const DEFAULT_END_HOUR = 24;
 
 function minuteOfDay(date: Date): number {
   return date.getHours() * 60 + date.getMinutes();
@@ -36,7 +37,7 @@ function minuteOfDay(date: Date): number {
 /**
  * Places a day's tasks on the timeline.
  * Overlapping blocks share their space in lanes (like any calendar), so none is hidden behind another.
- * The visible hours always include 06:00–22:00 and stretch to cover tasks outside that window.
+ * The axis is always the whole day, 00:00–24:00.
  */
 export function layoutDay(tasks: readonly Task[]): DayLayout {
   const items = tasks

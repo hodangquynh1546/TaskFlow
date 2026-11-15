@@ -10,7 +10,7 @@ const lanes = (layout: ReturnType<typeof layoutDay>) => layout.blocks.map((b) =>
 
 describe('layoutDay', () => {
   it('an empty day has no blocks and the default hours', () => {
-    expect(layoutDay([])).toEqual({ blocks: [], startHour: 6, endHour: 22, plannedMinutes: 0, conflicts: 0 });
+    expect(layoutDay([])).toEqual({ blocks: [], startHour: 0, endHour: 24, plannedMinutes: 0, conflicts: 0 });
   });
 
   it('places a block by minute of the day', () => {
@@ -107,20 +107,17 @@ describe('layoutDay', () => {
   });
 
   describe('visible hours', () => {
-    it('always include 06:00 to 22:00', () => {
-      const layout = layoutDay([task(9, 0, 60)]);
-
-      expect([layout.startHour, layout.endHour]).toEqual([6, 22]);
+    it('are always the whole day, 00:00 to 24:00', () => {
+      expect([layoutDay([]).startHour, layoutDay([]).endHour]).toEqual([0, 24]);
+      expect([layoutDay([task(9, 0, 60)]).startHour, layoutDay([task(9, 0, 60)]).endHour]).toEqual([0, 24]);
     });
 
-    it('stretch earlier for an early task', () => {
-      expect(layoutDay([task(4, 30, 60)]).startHour).toBe(4);
-      expect(layoutDay([task(0, 0, 30)]).startHour).toBe(0);
-    });
+    it('stay the whole day for tasks at the very start and very end of it', () => {
+      const early = layoutDay([task(0, 0, 30)]);
+      const late = layoutDay([task(23, 0, 60)]);
 
-    it('stretch later to cover a late task, rounding up to the next full hour', () => {
-      expect(layoutDay([task(21, 0, 150)]).endHour).toBe(24);
-      expect(layoutDay([task(22, 10, 20)]).endHour).toBe(23);
+      expect([early.startHour, early.endHour]).toEqual([0, 24]);
+      expect([late.startHour, late.endHour]).toEqual([0, 24]);
     });
   });
 
