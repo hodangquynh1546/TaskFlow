@@ -34,6 +34,7 @@ import { DueLabelComponent } from '../../../shared/ui/due-label.component';
 import { ConfirmService } from '../../../shared/ui/confirm.service';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
+import { RepeatLabelComponent } from '../../../shared/ui/repeat-label.component';
 import { TimeBlockComponent } from '../../../shared/ui/time-block.component';
 import {
   PAGE_SIZES,
@@ -69,7 +70,7 @@ const SORT_KEYS: Readonly<Record<TaskSortField, MessageKey>> = {
   imports: [
     FormsModule, ReactiveFormsModule, RouterLink,
     NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzDropDownModule, NzIconModule, NzInputModule, NzMenuModule, NzPaginationModule, NzSelectModule,
-    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, TimeBlockComponent, TranslatePipe,
+    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, RepeatLabelComponent, TimeBlockComponent, TranslatePipe,
   ],
   templateUrl: './task-list.component.html',
   styleUrl: './task-list.component.scss',
@@ -313,9 +314,12 @@ export class TaskListComponent {
     }
     this.markBusy(task.id, true);
     this.tasks.changeStatus(task.id, status).subscribe({
-      next: () => {
+      next: (changed) => {
         this.markBusy(task.id, false);
-        this.notify.success(this.statusToast(status));
+        // Finishing a repeating task made the next one: say when it is, rather than only "done".
+        this.notify.success(
+          changed.next ? this.i18n.t('toast.nextCreated', { when: this.i18n.formatDateTime(changed.next.startDate) }) : this.statusToast(status),
+        );
         if (status === 'Completed') {
           burstConfetti(celebrateAt);
         }

@@ -186,3 +186,24 @@ describe('TaskService.suggestTitles', () => {
     expect(result).toEqual([]);
   });
 });
+
+describe('TaskService.startingBetween', () => {
+  it('asks only for tasks still to do inside the window, soonest first', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const service = TestBed.inject(TaskService);
+    const http = TestBed.inject(HttpTestingController);
+    const from = new Date(2026, 10, 16, 8, 50);
+    const to = new Date(2026, 10, 16, 9, 15);
+
+    service.startingBetween(from, to).subscribe();
+    const req = http.expectOne((r) => r.url.endsWith('/tasks'));
+    req.flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 1 });
+
+    expect(req.request.params.get('startFrom')).toBe(from.toISOString());
+    expect(req.request.params.get('startTo')).toBe(to.toISOString());
+    expect(req.request.params.get('status')).toBe('Todo');
+    expect(req.request.params.get('sortBy')).toBe('startDate');
+    expect(req.request.params.get('sortDir')).toBe('asc');
+    expect(req.request.params.get('pageSize')).toBe('50');
+  });
+});

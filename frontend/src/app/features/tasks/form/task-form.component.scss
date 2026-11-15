@@ -7,6 +7,16 @@
 .due { max-width: 50%; }
 .minutes { width: 8rem; }
 .durations { display: flex; flex-wrap: wrap; }
+.repeat-kind { width: 100%; max-width: 16rem; }
+.repeat-every { display: flex; align-items: center; gap: var(--tf-space-3); font-weight: 600; }
+.weekdays { display: flex; flex-wrap: wrap; gap: var(--tf-space-2); }
+.weekday {
+  min-width: 3rem; min-height: 40px; padding: 0 var(--tf-space-3); border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-pill);
+  background: var(--tf-paper); color: var(--tf-ink); font: 700 var(--tf-text-small) var(--tf-font-body); cursor: pointer;
+  transition: transform 140ms var(--tf-ease-pop), background-color 160ms ease;
+  &:hover { transform: translateY(-1px); }
+  &[aria-pressed='true'] { background: var(--tf-tangerine); color: var(--tf-on-color); }
+}
 
 .form-error {
   margin-bottom: var(--tf-space-4);

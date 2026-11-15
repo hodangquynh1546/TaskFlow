@@ -19,6 +19,7 @@ import { authInterceptor } from './core/http/auth.interceptor';
 import { errorInterceptor } from './core/http/error.interceptor';
 import { AppTitleStrategy } from './core/i18n/title.strategy';
 import { BrowseMemory } from './core/navigation/browse-memory';
+import { ReminderService } from './features/reminders/reminder.service';
 
 registerLocaleData(vi);
 
@@ -33,6 +34,8 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => inject(AuthService).restoreSession()),
     // Starts listening before the first navigation, so it knows where the user was when they open a task form.
     provideAppInitializer(() => void inject(BrowseMemory)),
+    // Starts watching for tasks about to begin as soon as someone is signed in.
+    provideAppInitializer(() => void inject(ReminderService)),
     { provide: LOCALE_ID, useValue: 'vi' },
     provideNzI18n(vi_VN),
     // NzModalService is not providedIn root (unlike NzMessageService); ConfirmService needs it app-wide.

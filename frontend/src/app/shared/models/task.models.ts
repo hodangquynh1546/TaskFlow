@@ -26,6 +26,20 @@ export const PRIORITY_LEVEL: Readonly<Record<TaskPriority, 1 | 2 | 3>> = {
   High: 3,
 };
 
+export type RecurrenceFrequency = 'Daily' | 'Weekly' | 'Monthly' | 'Yearly';
+
+export const RECURRENCE_FREQUENCIES: readonly RecurrenceFrequency[] = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+
+/** How a task repeats. `weekdays` is a bit mask, Monday = 1 ... Sunday = 64; 0 means the weekday of the start. */
+export interface Recurrence {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  weekdays: number;
+  until: string | null;
+  /** The user's own UTC offset, so "every Monday at 09:00" means Monday where they are. */
+  utcOffsetMinutes: number;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -40,6 +54,9 @@ export interface Task {
   isOverdue: boolean;
   createdAt: string;
   updatedAt: string;
+  recurrence?: Recurrence | null;
+  /** Only in the answer to finishing a repeating task: the occurrence that was created. */
+  next?: { id: string; startDate: string } | null;
 }
 
 export interface PagedResult<T> {
@@ -59,6 +76,7 @@ export interface TaskPayload {
   startDate: string | null;
   dueDate: string | null;
   durationMinutes: number | null;
+  recurrence?: Recurrence | null;
 }
 
 export interface DashboardSummary {

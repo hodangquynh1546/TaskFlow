@@ -147,6 +147,7 @@ describe('scheduleValidator', () => {
     const g = new FormGroup({
       startDate: new FormControl(v.startDate), startTime: new FormControl(v.startTime), durationChoice: new FormControl(v.durationChoice),
       customMinutes: new FormControl(v.customMinutes),
+      repeat: new FormControl(v.repeat), repeatEvery: new FormControl(v.repeatEvery), repeatDays: new FormControl(v.repeatDays), repeatUntil: new FormControl(v.repeatUntil),
     });
     return scheduleValidator()(g);
   };
@@ -194,6 +195,82 @@ describe('scheduleValidator', () => {
 
   it('reports several problems at once', () => {
     expect(group({ startTime: '09:00', durationChoice: 'custom', customMinutes: 0 })).toEqual({ timeWithoutDate: true, customDuration: true });
+  });
+});
+
+describe('repeating', () => {
+  const start = new Date(2026, 10, 16, 9, 0); // a Monday
+  const base = { ...EMPTY_TASK_FORM, title: 'Việc', startDate: start, startTime: '09:00' };
+  const group = (patch: Partial<TaskFormValue>) => {
+    const v = { ...base, ...patch };
+    return scheduleValidator()(new FormGroup({
+      startDate: new FormControl(v.startDate), startTime: new FormControl(v.startTime), durationChoice: new FormControl(v.durationChoice),
+      customMinutes: new FormControl(v.customMinutes), repeat: new FormControl(v.repeat), repeatEvery: new FormControl(v.repeatEvery),
+      repeatDays: new FormControl(v.repeatDays), repeatUntil: new FormControl(v.repeatUntil),
+    }));
+  };
+
+  it('a task that does not repeat sends no repeat, even with a start time', () => {
+    expect(formValueToPayload(base).recurrence).toBeNull();
+  });
+
+  it('sends the rule with the user\'s own UTC offset', () => {
+    const payload = formValueToPayload({ ...base, repeat: 'Daily', repeatEvery: 3 });
+
+    expect(payload.recurrence).toEqual({ frequency: 'Daily', interval: 3, weekdays: 0, until: null, utcOffsetMinutes: -start.getTimezoneOffset() });
+  });
+
+  it('sends the chosen weekdays only for a weekly repeat', () => {
+    expect(formValueToPayload({ ...base, repeat: 'Weekly', repeatDays: 5 }).recurrence!.weekdays).toBe(5);
+    expect(formValueToPayload({ ...base, repeat: 'Monthly', repeatDays: 5 }).recurrence!.weekdays).toBe(0);
+  });
+
+  it('the end day lasts through that whole day', () => {
+    const payload = formValueToPayload({ ...base, repeat: 'Daily', repeatUntil: new Date(2026, 11, 31, 3, 0) });
+
+    expect(new Date(payload.recurrence!.until!)).toEqual(new Date(2026, 11, 31, 23, 59, 0, 0));
+  });
+
+  it('without a start day there is nothing to repeat from, so no repeat is sent', () => {
+    expect(formValueToPayload({ ...base, startDate: null, startTime: '', repeat: 'Daily' }).recurrence).toBeNull();
+  });
+
+  it('loads an existing repeat back into the form', () => {
+    const value = taskToFormValue({ ...existing, recurrence: { frequency: 'Weekly', interval: 2, weekdays: 5, until: new Date(2026, 11, 31).toISOString(), utcOffsetMinutes: 420 } });
+
+    expect(value).toMatchObject({ repeat: 'Weekly', repeatEvery: 2, repeatDays: 5 });
+    expect(value.repeatUntil).toEqual(new Date(2026, 11, 31));
+  });
+
+  it('a task with no repeat loads as "none, every 1"', () => {
+    expect(taskToFormValue(existing)).toMatchObject({ repeat: 'none', repeatEvery: 1, repeatDays: 0, repeatUntil: null });
+  });
+
+  describe('validation', () => {
+    it('is fine when it repeats from a start day', () => {
+      expect(group({ repeat: 'Daily' })).toBeNull();
+    });
+
+    it('needs a start day', () => {
+      expect(group({ repeat: 'Daily', startDate: null, startTime: '' })).toEqual({ repeatNeedsStart: true });
+    });
+
+    it.each([[0], [100], [2.5], [null], [-1]])('refuses an interval of %j', (every) => {
+      expect(group({ repeat: 'Daily', repeatEvery: every })).toEqual({ repeatEvery: true });
+    });
+
+    it.each([[1], [99]])('accepts an interval of %i', (every) => {
+      expect(group({ repeat: 'Weekly', repeatEvery: every })).toBeNull();
+    });
+
+    it('refuses an end day before the start day but accepts the same day', () => {
+      expect(group({ repeat: 'Daily', repeatUntil: new Date(2026, 10, 15) })).toEqual({ repeatUntilBeforeStart: true });
+      expect(group({ repeat: 'Daily', repeatUntil: new Date(2026, 10, 16) })).toBeNull();
+    });
+
+    it('is not asked about anything when the task does not repeat', () => {
+      expect(group({ repeat: 'none', repeatEvery: 0, startDate: null, startTime: '' })).toBeNull();
+    });
   });
 });
 

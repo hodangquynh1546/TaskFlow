@@ -71,10 +71,11 @@ public sealed class TestApi(ApiFactory factory, PostgresFixture postgres)
         DateTimeOffset? due = null,
         DateTimeOffset? created = null,
         DateTimeOffset? updated = null,
-        int? durationMinutes = null)
+        int? durationMinutes = null,
+        Recurrence? recurrence = null)
     {
         var createdAt = created ?? DateTimeOffset.UtcNow;
-        var task = TaskItem.Create(userId, title, null, priority, status, start, due, createdAt, durationMinutes);
+        var task = TaskItem.Create(userId, title, null, priority, status, start, due, createdAt, durationMinutes, recurrence);
         if (updated is { } u && u != createdAt)
         {
             task.ChangeStatus(status, u);

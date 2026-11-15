@@ -115,7 +115,8 @@ internal sealed class TaskService(
 
         var now = clock.GetUtcNow();
         // The owner always comes from the token (BR-01); there is no UserId on the request to trust.
-        var task = TaskItem.Create(currentUser.UserId, request.Title, request.Description, request.Priority, request.Status, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes);
+        var task = TaskItem.Create(currentUser.UserId, request.Title, request.Description, request.Priority, request.Status, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes,
+            request.Recurrence?.ToDomain());
         db.Tasks.Add(task);
         await db.SaveChangesAsync(cancellationToken);
         return TaskDto.From(task, now);
@@ -127,9 +128,12 @@ internal sealed class TaskService(
 
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         var now = clock.GetUtcNow();
-        task.Update(request.Title, request.Description, request.Priority!.Value, request.Status!.Value, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes);
+        var wasFinished = task.Status == TaskItemStatus.Completed;
+        task.Update(request.Title, request.Description, request.Priority!.Value, request.Status!.Value, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes,
+            request.Recurrence?.ToDomain());
+        var next = !wasFinished && task.Status == TaskItemStatus.Completed ? SpawnNext(task, now) : null;
         await db.SaveChangesAsync(cancellationToken);
-        return TaskDto.From(task, now);
+        return TaskDto.From(task, now, next);
     }
 
     public async Task<TaskDto> ChangeStatusAsync(Guid id, ChangeStatusRequest request, CancellationToken cancellationToken)
@@ -138,9 +142,11 @@ internal sealed class TaskService(
 
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         var now = clock.GetUtcNow();
+        var wasFinished = task.Status == TaskItemStatus.Completed;
         task.ChangeStatus(request.Status!.Value, now);
+        var next = !wasFinished && task.Status == TaskItemStatus.Completed ? SpawnNext(task, now) : null;
         await db.SaveChangesAsync(cancellationToken);
-        return TaskDto.From(task, now);
+        return TaskDto.From(task, now, next);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -148,6 +154,31 @@ internal sealed class TaskService(
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         db.Tasks.Remove(task);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Finishing a repeating task creates the next one, once: finishing it again after re-opening does not make a second.
+    /// The next one is the first occurrence after now, so a task finished days late does not bring back days of past ones.
+    /// </summary>
+    private TaskItem? SpawnNext(TaskItem finished, DateTimeOffset now)
+    {
+        if (finished.Recurrence is not { } rule || finished.StartDate is not { } start || finished.RecurrenceSpawned)
+        {
+            return null;
+        }
+
+        finished.MarkNextCreated();
+        if (rule.NextStartAfter(start, now) is not { } nextStart)
+        {
+            return null; // the series has reached its end day
+        }
+
+        var next = TaskItem.Create(
+            finished.UserId, finished.Title, finished.Description, finished.Priority, TaskItemStatus.Todo, nextStart,
+            TaskSchedule.DueFor(nextStart, finished.DurationMinutes, null), now, finished.DurationMinutes,
+            rule with { }); // its own copy: EF cannot let two tasks own one repeat object
+        db.Tasks.Add(next);
+        return next;
     }
 
     /// <summary>

@@ -1,11 +1,13 @@
 'use strict';
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, Menu, dialog, shell, safeStorage, session } = require('electron');
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, shell, safeStorage, session } = require('electron');
 const { resolvePaths } = require('./src/paths');
 const { TaskFlowRuntime } = require('./src/lifecycle');
 const { buildMenuTemplate } = require('./src/menu');
 const { translator } = require('./src/strings');
+const { allowPermission, shouldHideOnClose } = require('./src/policy');
+const { buildTrayMenu } = require('./src/tray');
 
 // Own folder, so it never mixes with the Docker setup's data (~/Library/Application Support/TaskFlow).
 const userData = process.env.TASKFLOW_USER_DATA || path.join(app.getPath('appData'), 'TaskFlow Desktop');
@@ -22,6 +24,7 @@ const paths = resolvePaths({
 const hidden = process.env.TASKFLOW_HIDDEN === '1';
 const runtime = new TaskFlowRuntime({ paths, safeStorage });
 let win = null;
+let tray = null;
 let quitting = false;
 
 const loadingFile = path.join(__dirname, 'loading.html');
@@ -43,6 +46,30 @@ function saveBounds() {
   fs.writeFileSync(paths.stateFile, JSON.stringify({ bounds: win.getBounds() }));
 }
 
+function showWindow() {
+  if (!win) {
+    // The window can be destroyed without a close event (a page calling window.close()); the app stays up, so bring it back.
+    if (runtime.url && !quitting) {
+      createWindow();
+      win.loadURL(runtime.url).then(() => win?.show());
+    }
+    return;
+  }
+  if (win.isMinimized()) {
+    win.restore();
+  }
+  win.show();
+  win.focus();
+}
+
+function createTray() {
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'src', 'assets', 'tray.png')).resize({ width: 18, height: 18 });
+  tray = new Tray(icon);
+  tray.setToolTip(t('trayTooltip'));
+  tray.setContextMenu(Menu.buildFromTemplate(buildTrayMenu({ t, actions: { show: showWindow, quit: () => app.quit() } })));
+  tray.on('click', showWindow);
+}
+
 function createWindow() {
   const { bounds } = readState();
   win = new BrowserWindow({
@@ -55,9 +82,24 @@ function createWindow() {
     show: !hidden,
     title: 'TaskFlow',
     backgroundColor: '#f1f6ff',
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      spellcheck: false,
+      preload: path.join(__dirname, 'preload.js'),
+      // Reminders are checked by the page, so it must keep its timers running while the window is tucked away.
+      backgroundThrottling: false,
+    },
   });
-  win.on('close', saveBounds);
+  win.on('close', (event) => {
+    saveBounds();
+    // Closing the window only hides it: the app keeps running in the menu bar so it can still remind you.
+    if (shouldHideOnClose({ quitting })) {
+      event.preventDefault();
+      win.hide();
+    }
+  });
   win.on('closed', () => {
     win = null;
   });
@@ -157,26 +199,31 @@ const actions = {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    if (win) {
-      if (win.isMinimized()) {
-        win.restore();
-      }
-      win.focus();
-    }
-  });
+  app.on('second-instance', showWindow);
+  // Clicking the Dock icon brings the window back too.
+  app.on('activate', showWindow);
 
   app.whenReady().then(() => {
     // Nothing in this app needs the camera, microphone, location or notifications from the page.
-    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-    session.defaultSession.setPermissionCheckHandler(() => false);
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => callback(allowPermission(permission, details.requestingUrl, runtime.url)));
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) => allowPermission(permission, requestingOrigin, runtime.url));
+    // A reminder that was clicked asks for the window back; only our own page may ask.
+    ipcMain.on('show-window', (event) => {
+      if (runtime.url && new URL(event.senderFrame.url).origin === new URL(runtime.url).origin) {
+        showWindow();
+      }
+    });
     Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ t, actions, isDev: !app.isPackaged })));
     createWindow();
+    if (!hidden) {
+      createTray();
+    }
     startRuntime();
   });
 
-  // Closing the window ends the app, and with it the database and API (no leftover background processes).
-  app.on('window-all-closed', () => app.quit());
+  // No window-all-closed handler: closing the window hides it and the app keeps running in the menu bar to
+  // deliver reminders. It ends only through Quit (Cmd+Q or the menu-bar item), which stops the database and API.
+  app.on('window-all-closed', () => {});
 
   app.on('before-quit', (event) => {
     if (quitting) {

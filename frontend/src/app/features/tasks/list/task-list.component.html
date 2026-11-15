@@ -99,14 +99,15 @@
                     }
                   </div>
 
-                  <div class="row__meta">
-                    <!-- A missing deadline is the normal case; repeating "no deadline" on every row is noise. -->
-                    @if (task.dueDate) {
-                      <tf-due [dueDate]="task.dueDate" [status]="task.status" />
-                    } @else {
-                      <span></span>
-                    }
-                  </div>
+                  <!-- A missing deadline is the normal case; repeating "no deadline" on every row is noise. -->
+                  @if (task.dueDate || task.recurrence) {
+                    <div class="row__meta">
+                      @if (task.dueDate) {
+                        <tf-due [dueDate]="task.dueDate" [status]="task.status" />
+                      }
+                      <tf-repeat [recurrence]="task.recurrence" />
+                    </div>
+                  }
 
                   <div class="row__status seg" role="group" [attr.aria-label]="'tasks.statusGroup' | t: { title: task.title }">
                     @for (status of statuses; track status) {

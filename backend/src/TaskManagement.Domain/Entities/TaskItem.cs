@@ -22,6 +22,12 @@ public sealed class TaskItem
     /// <summary>Planned length in minutes (BR-13). With <see cref="StartDate"/> it describes a block of time in a day.</summary>
     public int? DurationMinutes { get; private set; }
 
+    /// <summary>Null for a task that does not repeat.</summary>
+    public Recurrence? Recurrence { get; private set; }
+
+    /// <summary>True once finishing this task has produced the next occurrence, so finishing it again does not make a second one.</summary>
+    public bool RecurrenceSpawned { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -37,7 +43,8 @@ public sealed class TaskItem
         DateTimeOffset? startDate,
         DateTimeOffset? dueDate,
         DateTimeOffset now,
-        int? durationMinutes = null)
+        int? durationMinutes = null,
+        Recurrence? recurrence = null)
     {
         if (userId == Guid.Empty)
         {
@@ -50,7 +57,7 @@ public sealed class TaskItem
             UserId = userId,
             CreatedAt = now.ToUniversalTime(),
         };
-        task.Apply(title, description, priority ?? TaskPriority.Medium, status ?? TaskItemStatus.Todo, startDate, dueDate, now, durationMinutes);
+        task.Apply(title, description, priority ?? TaskPriority.Medium, status ?? TaskItemStatus.Todo, startDate, dueDate, now, durationMinutes, recurrence);
         return task;
     }
 
@@ -63,8 +70,9 @@ public sealed class TaskItem
         DateTimeOffset? startDate,
         DateTimeOffset? dueDate,
         DateTimeOffset now,
-        int? durationMinutes = null) =>
-        Apply(title, description, priority, status, startDate, dueDate, now, durationMinutes);
+        int? durationMinutes = null,
+        Recurrence? recurrence = null) =>
+        Apply(title, description, priority, status, startDate, dueDate, now, durationMinutes, recurrence);
 
     /// <summary>BR-08: any status can move to any other, including re-opening a completed task.</summary>
     public void ChangeStatus(TaskItemStatus status, DateTimeOffset now)
@@ -86,7 +94,8 @@ public sealed class TaskItem
         DateTimeOffset? startDate,
         DateTimeOffset? dueDate,
         DateTimeOffset now,
-        int? durationMinutes)
+        int? durationMinutes,
+        Recurrence? recurrence)
     {
         var cleanTitle = title?.Trim() ?? string.Empty;
         if (cleanTitle.Length is 0 or > TitleMaxLength)
@@ -114,6 +123,12 @@ public sealed class TaskItem
             throw new DomainException("Ngày bắt đầu không được sau hạn hoàn thành.", "startDate");
         }
 
+        recurrence?.EnsureValid();
+        if (recurrence is not null && start is null)
+        {
+            throw new DomainException("Việc lặp lại cần có giờ bắt đầu.", "recurrence");
+        }
+
         Title = cleanTitle;
         Description = string.IsNullOrWhiteSpace(description) ? null : description;
         Priority = priority;
@@ -121,8 +136,12 @@ public sealed class TaskItem
         StartDate = start;
         DueDate = due;
         DurationMinutes = durationMinutes;
+        Recurrence = recurrence;
         UpdatedAt = now.ToUniversalTime();
     }
+
+    /// <summary>Called when finishing this task has produced its next occurrence (or the series had ended).</summary>
+    public void MarkNextCreated() => RecurrenceSpawned = true;
 
     private static void RequireDefined<T>(T value, string field) where T : struct, Enum
     {

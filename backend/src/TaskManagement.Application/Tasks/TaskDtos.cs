@@ -15,9 +15,12 @@ public sealed record TaskDto(
     int? DurationMinutes,
     bool IsOverdue,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    RecurrenceDto? Recurrence = null,
+    NextTaskDto? Next = null)
 {
-    public static TaskDto From(TaskItem task, DateTimeOffset now) => new(
+    /// <param name="next">Only given in the answer to the call that finished a repeating task, to say what was created.</param>
+    public static TaskDto From(TaskItem task, DateTimeOffset now, TaskItem? next = null) => new(
         task.Id,
         task.Title,
         task.Description,
@@ -28,8 +31,22 @@ public sealed record TaskDto(
         task.DurationMinutes,
         task.IsOverdue(now),
         task.CreatedAt,
-        task.UpdatedAt);
+        task.UpdatedAt,
+        RecurrenceDto.From(task.Recurrence),
+        next is { StartDate: { } nextStart } ? new NextTaskDto(next.Id, nextStart) : null);
 }
+
+/// <summary>How a task repeats. Weekdays is a bit mask, Monday = 1 ... Sunday = 64.</summary>
+public sealed record RecurrenceDto(RecurrenceFrequency Frequency, int Interval, int Weekdays, DateTimeOffset? Until, int UtcOffsetMinutes)
+{
+    public static RecurrenceDto? From(Recurrence? recurrence) =>
+        recurrence is null ? null : new(recurrence.Frequency, recurrence.Interval, recurrence.Weekdays, recurrence.Until, recurrence.UtcOffsetMinutes);
+
+    public Recurrence ToDomain() => new(Frequency, Interval, Weekdays, Until?.ToUniversalTime(), UtcOffsetMinutes);
+}
+
+/// <summary>The occurrence created when a repeating task was finished.</summary>
+public sealed record NextTaskDto(Guid Id, DateTimeOffset StartDate);
 
 /// <summary>
 /// Status and priority are optional on create and fall back to Todo / Medium (BR-04, BR-05).
@@ -37,6 +54,14 @@ public sealed record TaskDto(
 /// duration, or the start itself without a duration). <c>DueDate</c> is only honoured for a task with no start time, which
 /// keeps older clients and older tasks working.
 /// </summary>
+/// <summary>What the repeat rules need to know about a request that may repeat.</summary>
+public interface IRecurringRequest
+{
+    DateTimeOffset? StartDate { get; }
+
+    RecurrenceDto? Recurrence { get; }
+}
+
 public sealed record CreateTaskRequest(
     string Title,
     string? Description,
@@ -44,7 +69,8 @@ public sealed record CreateTaskRequest(
     TaskItemStatus? Status,
     DateTimeOffset? StartDate,
     DateTimeOffset? DueDate,
-    int? DurationMinutes = null);
+    int? DurationMinutes = null,
+    RecurrenceDto? Recurrence = null) : IRecurringRequest;
 
 /// <summary>
 /// Full replacement. Priority and Status are nullable only so that a missing value can be rejected;
@@ -57,7 +83,8 @@ public sealed record UpdateTaskRequest(
     TaskItemStatus? Status,
     DateTimeOffset? StartDate,
     DateTimeOffset? DueDate,
-    int? DurationMinutes = null);
+    int? DurationMinutes = null,
+    RecurrenceDto? Recurrence = null) : IRecurringRequest;
 
 public sealed record ChangeStatusRequest(TaskItemStatus? Status);
 

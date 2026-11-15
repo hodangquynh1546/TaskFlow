@@ -29,6 +29,9 @@ const MESSAGES = {
     restoreDone: 'Đã khôi phục dữ liệu',
     failed: 'Không thực hiện được',
     backupFilter: 'Bản sao lưu TaskFlow',
+    trayOpen: 'Mở TaskFlow',
+    trayQuit: 'Thoát TaskFlow',
+    trayTooltip: 'TaskFlow vẫn chạy để nhắc việc',
   },
   en: {
     starting: 'Starting TaskFlow…',
@@ -58,6 +61,9 @@ const MESSAGES = {
     restoreDone: 'Data restored',
     failed: 'That did not work',
     backupFilter: 'TaskFlow backup',
+    trayOpen: 'Open TaskFlow',
+    trayQuit: 'Quit TaskFlow',
+    trayTooltip: 'TaskFlow keeps running to remind you',
   },
 };
 

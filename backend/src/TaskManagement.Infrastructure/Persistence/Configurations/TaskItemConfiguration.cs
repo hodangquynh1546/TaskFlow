@@ -28,6 +28,16 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.Property(t => t.Status).IsRequired().HasConversion<int>();
         builder.Property(t => t.Priority).IsRequired().HasConversion<int>();
         builder.Property(t => t.StartDate);
+        builder.Property(t => t.RecurrenceSpawned).IsRequired().HasDefaultValue(false);
+        // No repeat is no row values at all (all five columns null); a repeat fills them.
+        builder.OwnsOne(t => t.Recurrence, r =>
+        {
+            r.Property(x => x.Frequency).HasColumnName("RecurrenceFrequency").HasConversion<int>();
+            r.Property(x => x.Interval).HasColumnName("RecurrenceInterval");
+            r.Property(x => x.Weekdays).HasColumnName("RecurrenceWeekdays");
+            r.Property(x => x.Until).HasColumnName("RecurrenceUntil");
+            r.Property(x => x.UtcOffsetMinutes).HasColumnName("RecurrenceUtcOffsetMinutes");
+        });
         builder.Property(t => t.DueDate);
         builder.Property(t => t.DurationMinutes);
         builder.Property(t => t.CreatedAt).IsRequired();

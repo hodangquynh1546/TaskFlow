@@ -78,6 +78,14 @@
           <button nz-button nzType="primary" type="submit" [nzLoading]="savingPassword()">{{ 'profile.password' | t }}</button>
         </form>
       </section>
+
+      <section class="section tf-panel tf-pop" style="--i: 2" aria-labelledby="reminder-title">
+        <tf-reminder-settings />
+      </section>
+
+      <section class="section tf-panel tf-pop" style="--i: 3" aria-labelledby="data-title">
+        <tf-data-port />
+      </section>
     </div>
   }
 }

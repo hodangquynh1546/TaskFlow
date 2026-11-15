@@ -69,10 +69,10 @@ describe('ProfileComponent', () => {
       expect(el.querySelector<HTMLInputElement>(infoName)!.value).toBe('Nguyễn Văn An');
     });
 
-    it('has two labelled sections', async () => {
+    it('has four labelled sections: account, password, reminders and data', async () => {
       const { el } = await setup();
 
-      expect([...el.querySelectorAll('section h2')].map((h) => h.textContent)).toEqual(['Thông tin tài khoản', 'Đổi mật khẩu']);
+      expect([...el.querySelectorAll('section h2')].map((h) => h.textContent)).toEqual(['Thông tin tài khoản', 'Đổi mật khẩu', 'Nhắc việc', 'Dữ liệu của bạn']);
     });
   });
 

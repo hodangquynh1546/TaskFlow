@@ -64,6 +64,19 @@ export class TaskService {
     return text ? this.http.get<string[]>(`${this.url}/title-suggestions`, { params: new HttpParams().set('prefix', text).set('limit', 8) }) : of([]);
   }
 
+  /** Tasks still to do that start inside a window of time, soonest first: what the reminders look at. */
+  startingBetween(from: Date, to: Date): Observable<PagedResult<Task>> {
+    const params = new HttpParams()
+      .set('startFrom', from.toISOString())
+      .set('startTo', to.toISOString())
+      .set('status', 'Todo')
+      .set('sortBy', 'startDate')
+      .set('sortDir', 'asc')
+      .set('page', 1)
+      .set('pageSize', 50);
+    return this.http.get<PagedResult<Task>>(this.url, { params });
+  }
+
   /** The tasks that start on one local day ("yyyy-MM-dd"), earliest first. At most 50: more than that is not a day anyone plans. */
   forDay(day: string): Observable<PagedResult<Task>> {
     const params = new HttpParams()

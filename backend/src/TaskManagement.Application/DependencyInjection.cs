@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using TaskManagement.Application.Auth;
 using TaskManagement.Application.Dashboard;
+using TaskManagement.Application.Data;
 using TaskManagement.Application.Tasks;
 using TaskManagement.Application.Users;
 
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IDataPortService, DataPortService>();
 
         // Every AbstractValidator<T> in this assembly is registered as IValidator<T> (stateless, so singleton).
         var validators = typeof(DependencyInjection).Assembly.GetTypes()

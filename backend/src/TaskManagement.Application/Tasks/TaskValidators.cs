@@ -1,5 +1,6 @@
 using FluentValidation;
 using TaskManagement.Domain.Entities;
+using TaskManagement.Domain.Enums;
 
 namespace TaskManagement.Application.Tasks;
 
@@ -12,9 +13,39 @@ internal static class TaskRules
     public static IRuleBuilderOptions<T, string?> ValidDescription<T>(this IRuleBuilder<T, string?> rule) =>
         rule.MaximumLength(TaskItem.DescriptionMaxLength).WithMessage($"Mô tả tối đa {TaskItem.DescriptionMaxLength} ký tự.");
 
+    /// <summary>A repeat needs a start time to repeat from, and its own numbers must make sense.</summary>
+    public static void ValidRepeat<T>(this AbstractValidator<T> validator) where T : IRecurringRequest
+    {
+        validator.RuleFor(x => x.Recurrence).SetValidator(new RecurrenceDtoValidator()!).When(x => x.Recurrence is not null);
+        validator.RuleFor(x => x.Recurrence).Must((x, _) => x.StartDate.HasValue)
+            .When(x => x.Recurrence is not null)
+            .WithMessage("Việc lặp lại cần có giờ bắt đầu.");
+        validator.RuleFor(x => x.Recurrence).Must((x, r) => EndsOnOrAfterStart(r!, x.StartDate!.Value))
+            .When(x => x.Recurrence is { Until: not null, UtcOffsetMinutes: >= -Recurrence.MaxOffsetMinutes and <= Recurrence.MaxOffsetMinutes } && x.StartDate.HasValue)
+            .WithMessage("Ngày kết thúc lặp không được trước ngày bắt đầu.");
+    }
+
+    private static bool EndsOnOrAfterStart(RecurrenceDto repeat, DateTimeOffset start)
+    {
+        var offset = TimeSpan.FromMinutes(repeat.UtcOffsetMinutes);
+        return repeat.Until!.Value.ToOffset(offset).Date >= start.ToOffset(offset).Date;
+    }
+
     public static IRuleBuilderOptions<T, int?> ValidDuration<T>(this IRuleBuilder<T, int?> rule) =>
         rule.InclusiveBetween(1, TaskItem.MaxDurationMinutes)
             .WithMessage($"Thời lượng phải từ 1 đến {TaskItem.MaxDurationMinutes} phút.");
+}
+
+public sealed class RecurrenceDtoValidator : AbstractValidator<RecurrenceDto>
+{
+    public RecurrenceDtoValidator()
+    {
+        RuleFor(x => x.Frequency).IsInEnum().WithMessage("Kiểu lặp không hợp lệ.");
+        RuleFor(x => x.Interval).InclusiveBetween(1, Recurrence.MaxInterval).WithMessage($"Khoảng lặp phải từ 1 đến {Recurrence.MaxInterval}.");
+        RuleFor(x => x.Weekdays).InclusiveBetween(0, Recurrence.AllWeekdays).WithMessage("Ngày lặp trong tuần không hợp lệ.");
+        RuleFor(x => x.Weekdays).Equal(0).When(x => x.Frequency != RecurrenceFrequency.Weekly).WithMessage("Ngày lặp trong tuần không hợp lệ.");
+        RuleFor(x => x.UtcOffsetMinutes).InclusiveBetween(-Recurrence.MaxOffsetMinutes, Recurrence.MaxOffsetMinutes).WithMessage("Múi giờ không hợp lệ.");
+    }
 }
 
 public sealed class CreateTaskRequestValidator : AbstractValidator<CreateTaskRequest>
@@ -26,6 +57,7 @@ public sealed class CreateTaskRequestValidator : AbstractValidator<CreateTaskReq
         RuleFor(x => x.DurationMinutes).ValidDuration().When(x => x.DurationMinutes.HasValue);
         RuleFor(x => x.Priority).IsInEnum().When(x => x.Priority.HasValue).WithMessage("Mức ưu tiên không hợp lệ.");
         RuleFor(x => x.Status).IsInEnum().When(x => x.Status.HasValue).WithMessage("Trạng thái không hợp lệ.");
+        this.ValidRepeat();
     }
 }
 
@@ -40,6 +72,7 @@ public sealed class UpdateTaskRequestValidator : AbstractValidator<UpdateTaskReq
             .IsInEnum().WithMessage("Mức ưu tiên không hợp lệ.");
         RuleFor(x => x.Status).NotNull().WithMessage("Trạng thái là bắt buộc.")
             .IsInEnum().WithMessage("Trạng thái không hợp lệ.");
+        this.ValidRepeat();
     }
 }
 

@@ -87,6 +87,52 @@
       </nz-form-item>
     }
 
+    <nz-form-item>
+      <nz-form-label nzFor="repeat">{{ 'form.repeat' | t }}</nz-form-label>
+      <nz-form-control>
+        <nz-select nzId="repeat" formControlName="repeat" class="repeat-kind">
+          <nz-option nzValue="none" [nzLabel]="'repeat.none' | t" />
+          @for (option of repeatOptions; track option) {
+            <nz-option [nzValue]="option" [nzLabel]="i18n.t(repeatLabelKeys[option])" />
+          }
+        </nz-select>
+      </nz-form-control>
+    </nz-form-item>
+
+    @if (repeating()) {
+      <nz-form-item>
+        <nz-form-control [nzErrorTip]="everyError" [nzValidateStatus]="form.hasError('repeatEvery') ? 'error' : ''">
+          <div class="repeat-every">
+            <span>{{ 'repeat.every' | t }}</span>
+            <nz-input-number nzId="repeatEvery" formControlName="repeatEvery" [nzMin]="1" [nzMax]="maxRepeatEvery" [nzStep]="1" [nzPrecision]="0" class="minutes" />
+            <span>{{ repeatUnitKey() | t }}</span>
+          </div>
+          <ng-template #everyError>{{ errorText('repeatEvery') }}</ng-template>
+        </nz-form-control>
+      </nz-form-item>
+
+      @if (weekly()) {
+        <nz-form-item>
+          <nz-form-label id="repeat-days-label">{{ 'repeat.days' | t }}</nz-form-label>
+          <nz-form-control [nzExtra]="'repeat.daysHint' | t">
+            <div class="weekdays" role="group" aria-labelledby="repeat-days-label">
+              @for (day of weekdays(); track day.bit) {
+                <button type="button" class="weekday" [attr.aria-pressed]="day.on" (click)="toggleWeekday(day.bit)">{{ day.label }}</button>
+              }
+            </div>
+          </nz-form-control>
+        </nz-form-item>
+      }
+
+      <nz-form-item>
+        <nz-form-label nzFor="repeatUntil">{{ 'repeat.until' | t }}</nz-form-label>
+        <nz-form-control [nzErrorTip]="untilError" [nzValidateStatus]="form.hasError('repeatUntilBeforeStart') ? 'error' : ''">
+          <nz-date-picker nzId="repeatUntil" formControlName="repeatUntil" [nzFormat]="'format.date' | t" [nzPlaceHolder]="'form.pickDate' | t" class="full due" />
+          <ng-template #untilError>{{ errorText('repeatUntil') }}</ng-template>
+        </nz-form-control>
+      </nz-form-item>
+    }
+
   </div>
 
   @if (formError()) {

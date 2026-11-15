@@ -39,6 +39,7 @@ describe('TaskFormComponent', () => {
 
     expect(form.getRawValue()).toEqual({
       title: '', description: '', priority: 'Medium', status: 'Todo', startDate: null, startTime: '', durationChoice: 'none', customMinutes: null,
+      repeat: 'none', repeatEvery: 1, repeatDays: 0, repeatUntil: null,
     });
   });
 
@@ -152,6 +153,7 @@ describe('TaskFormComponent', () => {
         startDate: new Date(2026, 10, 18, 14, 0, 0, 0).toISOString(),
         dueDate: null,
         durationMinutes: 60,
+        recurrence: null,
       });
     });
 
@@ -489,6 +491,82 @@ describe('TaskFormComponent', () => {
       await new Promise((r) => setTimeout(r, 300));
 
       expect(component['suggestions']()).toEqual([]);
+    });
+  });
+
+  describe('repeating', () => {
+    it('starts as "does not repeat" with none of the repeat options showing', () => {
+      const { el } = setup();
+
+      expect(el.querySelector('nz-select.repeat-kind')).not.toBeNull();
+      expect(el.querySelector('.repeat-every')).toBeNull();
+      expect(el.querySelector('.weekdays')).toBeNull();
+    });
+
+    it('choosing a repeat shows how often, and weekly also shows the seven weekdays and an end day', () => {
+      const { el, set } = setup();
+
+      set({ repeat: 'Daily' });
+      expect(el.querySelector('.repeat-every')!.textContent).toContain('Mỗi');
+      expect(el.querySelector('.repeat-every')!.textContent).toContain('ngày');
+      expect(el.querySelector('.weekdays')).toBeNull();
+      expect(el.querySelector('#repeatUntil')).not.toBeNull();
+
+      set({ repeat: 'Weekly' });
+      expect([...el.querySelectorAll('.weekday')].map((b) => b.textContent!.trim())).toHaveLength(7);
+      expect(el.querySelector('.repeat-every')!.textContent).toContain('tuần');
+    });
+
+    it('weekday chips toggle their bit of the mask and say whether they are on', () => {
+      const { el, set, form, fixture } = setup();
+      set({ repeat: 'Weekly' });
+      const chips = () => [...el.querySelectorAll<HTMLButtonElement>('.weekday')];
+
+      chips()[0].click(); // Monday
+      chips()[2].click(); // Wednesday
+      fixture.detectChanges();
+      expect(form.getRawValue().repeatDays).toBe(1 | 4);
+      expect(chips().map((c) => c.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'true', 'false', 'false', 'false', 'false']);
+
+      chips()[0].click();
+      fixture.detectChanges();
+      expect(form.getRawValue().repeatDays).toBe(4);
+    });
+
+    it('will not save a repeat without a start day, and says what to do', () => {
+      const { submit, set, saved, text } = setup();
+      set({ title: 'Việc', repeat: 'Daily' });
+
+      submit();
+
+      expect(saved).not.toHaveBeenCalled();
+      expect(text()).toContain('Chọn ngày bắt đầu để việc này lặp lại.');
+    });
+
+    it('will not save an interval outside 1 to 99', () => {
+      const { submit, set, saved, text } = setup();
+      set({ title: 'Việc', startDate: new Date(2026, 10, 16), repeat: 'Daily', repeatEvery: 0 });
+
+      submit();
+
+      expect(saved).not.toHaveBeenCalled();
+      expect(text()).toContain('Khoảng lặp phải từ 1 đến 99.');
+    });
+
+    it('saves a valid repeat in the payload', () => {
+      const { submit, set, saved } = setup();
+      set({ title: 'Tập', startDate: new Date(2026, 10, 16), startTime: '07:00', repeat: 'Weekly', repeatEvery: 1, repeatDays: 1 | 4 });
+
+      submit();
+
+      expect(saved.mock.calls[0][0].recurrence).toMatchObject({ frequency: 'Weekly', interval: 1, weekdays: 5, until: null });
+    });
+
+    it('opens an existing repeating task with its repeat filled in', () => {
+      const { form, el } = setup({ task: aTask({ startDate: new Date(2026, 10, 16, 9, 0).toISOString(), recurrence: { frequency: 'Monthly', interval: 3, weekdays: 0, until: null, utcOffsetMinutes: 420 } }) });
+
+      expect(form.getRawValue()).toMatchObject({ repeat: 'Monthly', repeatEvery: 3 });
+      expect(el.querySelector('.repeat-every')!.textContent).toContain('tháng');
     });
   });
 });

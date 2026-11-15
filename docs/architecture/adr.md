@@ -89,6 +89,12 @@
 - **Frontend:** refresh token nằm cùng phiên trong `localStorage`. Interceptor làm mới trước khi gửi nếu access token đã hết hạn, và làm mới rồi gửi lại đúng một lần khi gặp 401; các yêu cầu cùng lúc dùng chung một lần làm mới. Chỉ khi server từ chối refresh token mới đăng xuất; mất mạng thì giữ phiên.
 - **Hệ quả:** thêm một bảng và migration `AddRefreshTokens`. Refresh token ở `localStorage` vẫn bị XSS đọc được, như access token (ADR-06); CSP chặt là lớp phòng thủ chính. Access token đã cấp vẫn dùng được đến khi hết hạn sau khi logout (tối đa 60 phút).
 
+## ADR-21 Nhắc việc: trang tự kiểm tra, ứng dụng Mac ở lại thanh menu khi đóng cửa sổ
+- **Bối cảnh:** cần nhắc việc cả khi đang mở lẫn khi đã đóng cửa sổ. Chưa có máy chủ nên không thể đẩy thông báo từ xa (điện thoại để sau).
+- **Quyết định:** quy tắc cố định theo mức ưu tiên, không có lựa chọn trong giao diện: Thấp không nhắc, Trung bình trước 5 phút, Cao trước 15 phút. Trang kiểm tra mỗi 30 giây các việc bắt đầu trong khoảng [bây giờ - 10 phút, bây giờ + 15 phút], nhắc một lần (nhớ trong `localStorage` khóa `tf.reminded`) bằng Web Notification API; việc mở app trễ quá 10 phút thì bỏ qua. Người dùng chỉ bật/tắt nhắc ở Hồ sơ.
+- **Ứng dụng Mac:** đóng cửa sổ chỉ ẩn nó (`close` bị chặn khi không phải đang thoát), app ở lại thanh menu (Tray) để trang vẫn chạy bộ đếm (`backgroundThrottling: false`). Chỉ thoát khi chọn Thoát (Cmd+Q hoặc menu thanh trạng thái), lúc đó dừng PostgreSQL và API như cũ. `window-all-closed` không còn thoát app; nếu cửa sổ bị hủy mà không qua `close` (trang gọi `window.close()`), `showWindow` tạo lại. Quyền thông báo chỉ cấp cho chính origin của app (`allowPermission`); bấm thông báo mở lại cửa sổ qua cầu `preload` (`showWindow`, chỉ nhận từ origin của app).
+- **Hệ quả:** đóng cửa sổ không còn giải phóng bộ nhớ/CPU của PostgreSQL và API; muốn tắt hẳn phải Thoát. Cần Keychain/thông báo của macOS cho phép TaskFlow.
+
 ## ADR-13 Công cụ tạo tài liệu Swagger UI
 - **Bối cảnh:** .NET 10 có `Microsoft.AspNetCore.OpenApi` sinh tài liệu nhưng không kèm giao diện.
 - **Quyết định (Phase 2):** `Swashbuckle.AspNetCore` 10.3.1 (một package, vừa sinh tài liệu vừa có Swagger UI). Bản 11.0.0 nhắm .NET 11 nên không dùng. Swagger chỉ bật ở Development và khai báo sẵn Bearer auth.

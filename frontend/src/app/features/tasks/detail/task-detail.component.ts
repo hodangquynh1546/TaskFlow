@@ -16,6 +16,7 @@ import { DueLabelComponent } from '../../../shared/ui/due-label.component';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
 import { PriorityMarkerComponent } from '../../../shared/ui/priority-marker.component';
 import { TaskMissingComponent } from '../../../shared/ui/task-missing.component';
+import { RepeatLabelComponent } from '../../../shared/ui/repeat-label.component';
 import { TimeBlockComponent } from '../../../shared/ui/time-block.component';
 import { createTaskResource } from '../task-resource';
 import { TaskService } from '../task.service';
@@ -23,7 +24,7 @@ import { TaskService } from '../task.service';
 @Component({
   selector: 'tf-task-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, NzButtonModule, NzIconModule, NzRadioModule, DueLabelComponent, ErrorStateComponent, PriorityMarkerComponent, TaskMissingComponent, TimeBlockComponent, TranslatePipe],
+  imports: [FormsModule, RouterLink, NzButtonModule, NzIconModule, NzRadioModule, DueLabelComponent, ErrorStateComponent, PriorityMarkerComponent, TaskMissingComponent, RepeatLabelComponent, TimeBlockComponent, TranslatePipe],
   templateUrl: './task-detail.component.html',
   styleUrl: './task-detail.component.scss',
 })

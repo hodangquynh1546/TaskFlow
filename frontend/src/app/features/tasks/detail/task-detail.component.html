@@ -54,6 +54,9 @@
             } @else {
               {{ 'detail.unscheduled' | t }}
             }
+            @if (task.recurrence) {
+              <tf-repeat [recurrence]="task.recurrence" />
+            }
           </dd>
         </div>
 

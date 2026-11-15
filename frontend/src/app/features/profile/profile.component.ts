@@ -12,6 +12,8 @@ import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { NotifyService } from '../../core/notify/notify.service';
 import { applyServerErrors, clearServerErrorOnEdit, firstError, revealAllErrors } from '../../shared/forms/server-errors';
 import { notBlankValidator } from '../../shared/forms/validators';
+import { ReminderSettingsComponent } from '../reminders/reminder-settings.component';
+import { DataPortComponent } from './data-port/data-port.component';
 import { ErrorStateComponent } from '../../shared/ui/error-state.component';
 import { PasswordRulesComponent } from '../../shared/ui/password-rules.component';
 import { PASSWORD_MAX_LENGTH, passwordPolicyValidator } from '../../shared/util/password-rules';
@@ -23,7 +25,7 @@ const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 @Component({
   selector: 'tf-profile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, NzButtonModule, NzFormModule, NzInputModule, ErrorStateComponent, PasswordRulesComponent, TranslatePipe],
+  imports: [ReactiveFormsModule, DataPortComponent, ReminderSettingsComponent, NzButtonModule, NzFormModule, NzInputModule, ErrorStateComponent, PasswordRulesComponent, TranslatePipe],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
 })

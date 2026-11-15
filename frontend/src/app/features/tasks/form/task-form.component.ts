@@ -15,9 +15,11 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { notBlankValidator } from '../../../shared/forms/validators';
 import { applyServerErrors, clearServerErrorOnEdit, firstError, revealAllErrors } from '../../../shared/forms/server-errors';
-import { PRIORITY_KEYS, STATUS_KEYS, TASK_PRIORITIES, TASK_STATUSES, Task, TaskPayload } from '../../../shared/models/task.models';
+import { PRIORITY_KEYS, RECURRENCE_FREQUENCIES, RecurrenceFrequency, STATUS_KEYS, TASK_PRIORITIES, TASK_STATUSES, Task, TaskPayload } from '../../../shared/models/task.models';
+import { MessageKey } from '../../../core/i18n/messages/vi';
 import {
   EMPTY_TASK_FORM,
+  MAX_REPEAT_EVERY,
   TaskFormValue,
   clockValidator,
   formValueToPayload,
@@ -79,12 +81,44 @@ export class TaskFormComponent {
       startTime: [EMPTY_TASK_FORM.startTime, [clockValidator]],
       durationChoice: [EMPTY_TASK_FORM.durationChoice],
       customMinutes: [EMPTY_TASK_FORM.customMinutes as number | null],
+      repeat: [EMPTY_TASK_FORM.repeat as TaskFormValue['repeat']],
+      repeatEvery: [EMPTY_TASK_FORM.repeatEvery as number | null],
+      repeatDays: [EMPTY_TASK_FORM.repeatDays],
+      repeatUntil: [EMPTY_TASK_FORM.repeatUntil as Date | null],
     },
     { validators: scheduleValidator() },
   );
 
   private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
   protected readonly customChosen = computed(() => this.formValue().durationChoice === 'custom');
+
+  protected readonly repeatOptions = RECURRENCE_FREQUENCIES;
+  protected readonly repeatLabelKeys: Readonly<Record<RecurrenceFrequency, MessageKey>> = {
+    Daily: 'repeat.option.Daily', Weekly: 'repeat.option.Weekly', Monthly: 'repeat.option.Monthly', Yearly: 'repeat.option.Yearly',
+  };
+  protected readonly maxRepeatEvery = MAX_REPEAT_EVERY;
+  protected readonly repeating = computed(() => this.formValue().repeat !== 'none');
+  protected readonly weekly = computed(() => this.formValue().repeat === 'Weekly');
+  protected readonly repeatUnitKey = computed<MessageKey>(() => {
+    const repeat = this.formValue().repeat;
+    return repeat === 'Weekly' ? 'repeat.unit.Weekly' : repeat === 'Monthly' ? 'repeat.unit.Monthly' : repeat === 'Yearly' ? 'repeat.unit.Yearly' : 'repeat.unit.Daily';
+  });
+
+  /** Monday to Sunday as chips, named in the interface language, each carrying its bit of the weekday mask. */
+  protected readonly weekdays = computed(() =>
+    Array.from({ length: 7 }, (_, i) => ({
+      bit: 1 << i,
+      // 2026-11-16 is a Monday.
+      label: this.i18n.formatDate(new Date(2026, 10, 16 + i), { weekday: 'short' }),
+      on: ((this.formValue().repeatDays ?? 0) & (1 << i)) !== 0,
+    })),
+  );
+
+  protected toggleWeekday(bit: number): void {
+    const days = this.form.controls.repeatDays;
+    days.setValue((days.value ?? 0) ^ bit);
+    days.markAsDirty();
+  }
 
   /** "Kết thúc lúc 10:30": the end of the block the form currently describes, or nothing while it is incomplete. */
   protected readonly endHint = computed(() => {
@@ -145,7 +179,7 @@ export class TaskFormComponent {
     }
   }
 
-  protected errorText(name: 'title' | 'description' | 'startDate' | 'startTime' | 'customMinutes'): string {
+  protected errorText(name: 'title' | 'description' | 'startDate' | 'startTime' | 'customMinutes' | 'repeatEvery' | 'repeatUntil'): string {
     const control = this.form.controls[name];
     const t = this.i18n.t.bind(this.i18n);
     const messages = {
@@ -154,6 +188,8 @@ export class TaskFormComponent {
       startDate: {},
       startTime: { invalidTime: t('err.timeFormat') },
       customMinutes: {},
+      repeatEvery: {},
+      repeatUntil: {},
     } as const;
     const own = firstError(control, messages[name]);
     if (own) {
@@ -164,6 +200,15 @@ export class TaskFormComponent {
     if (name === 'startDate' && group.hasError('timeWithoutDate')) {
       return t('err.timeNeedsDate');
     }
+    if (name === 'repeatEvery' && group.hasError('repeatEvery')) {
+      return t('repeat.everyInvalid');
+    }
+    if (name === 'repeatUntil' && group.hasError('repeatUntilBeforeStart')) {
+      return t('repeat.untilBeforeStart');
+    }
+    if (name === 'startDate' && group.hasError('repeatNeedsStart')) {
+      return t('repeat.needsStart');
+    }
     if (name === 'customMinutes' && group.hasError('customDuration') && (control.dirty || control.touched)) {
       return t('err.customMinutes', { max: MAX_DURATION_MINUTES });
     }
@@ -171,7 +216,7 @@ export class TaskFormComponent {
   }
 
   protected startInvalid(): boolean {
-    return this.form.hasError('timeWithoutDate');
+    return this.form.hasError('timeWithoutDate') || this.form.hasError('repeatNeedsStart');
   }
 
   protected customInvalid(): boolean {

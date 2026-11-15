@@ -372,6 +372,28 @@ describe('TaskListComponent', () => {
       expect(service.changeStatus).not.toHaveBeenCalled();
     });
 
+    it('finishing a repeating task says when the next one is, instead of only "done"', async () => {
+      const { el, service, notify, settle } = await setup();
+      const nextStart = new Date(2026, 10, 21, 9, 0).toISOString();
+      service.changeStatus.mockReturnValue(of(task({ status: 'Completed', next: { id: 'n1', startDate: nextStart } })));
+
+      button(el, 0, 'Completed').click();
+      await settle();
+
+      expect(notify.success).toHaveBeenCalledWith('Đã hoàn thành. Việc kế tiếp: 21/11/2026 09:00');
+    });
+
+    it('a repeating task shows how often it repeats on its row', async () => {
+      const { el } = await setup('/tasks', of(page([
+        task({ id: 'r', title: 'Lặp', recurrence: { frequency: 'Weekly', interval: 2, weekdays: 0, until: null, utcOffsetMinutes: 0 } }),
+        task({ id: 'o', title: 'Một lần' }),
+      ])));
+
+      const rows = el.querySelectorAll('.row');
+      expect(rows[0].querySelector('tf-repeat')!.textContent).toContain('Mỗi 2 tuần');
+      expect(rows[1].querySelector('tf-repeat')).toBeNull();
+    });
+
     it('a failed change is reported and does not refresh the list', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(throwError(() => new ApiError(404, 'Không tìm thấy công việc.')));

@@ -85,6 +85,11 @@ namespace TaskManagement.Infrastructure.Persistence.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("RecurrenceSpawned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<DateTimeOffset?>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -183,6 +188,41 @@ namespace TaskManagement.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.OwnsOne("TaskManagement.Domain.Entities.Recurrence", "Recurrence", b1 =>
+                        {
+                            b1.Property<Guid>("TaskItemId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("Frequency")
+                                .HasColumnType("integer")
+                                .HasColumnName("RecurrenceFrequency");
+
+                            b1.Property<int>("Interval")
+                                .HasColumnType("integer")
+                                .HasColumnName("RecurrenceInterval");
+
+                            b1.Property<DateTimeOffset?>("Until")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("RecurrenceUntil");
+
+                            b1.Property<int>("UtcOffsetMinutes")
+                                .HasColumnType("integer")
+                                .HasColumnName("RecurrenceUtcOffsetMinutes");
+
+                            b1.Property<int>("Weekdays")
+                                .HasColumnType("integer")
+                                .HasColumnName("RecurrenceWeekdays");
+
+                            b1.HasKey("TaskItemId");
+
+                            b1.ToTable("Tasks");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TaskItemId");
+                        });
+
+                    b.Navigation("Recurrence");
                 });
 #pragma warning restore 612, 618
         }
