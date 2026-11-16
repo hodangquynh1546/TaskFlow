@@ -69,10 +69,18 @@ describe('whereAfterSave', () => {
   });
 
   describe('from anywhere else', () => {
-    it.each([['/dashboard'], ['/profile']])('from %s the task list opens on the task, without filters', (url) => {
+    it.each([['/dashboard'], ['/profile']])('from %s it returns to that page, ignoring an older list in the memory', (url) => {
       const staleMemory: Browse = { kind: 'list', url: '/tasks?status=Completed' };
 
-      expect(whereAfterSave(url, staleMemory, task())).toBe('/tasks?highlight=abc');
+      expect(whereAfterSave(url, staleMemory, task())).toBe(url);
+    });
+
+    it('through a task page from the overview, the memory leads back to the overview', () => {
+      expect(whereAfterSave('/tasks/abc', { kind: 'page', url: '/dashboard' }, task())).toBe('/dashboard');
+    });
+
+    it('from an unknown page the task list opens on the task, without filters', () => {
+      expect(whereAfterSave('/nowhere', { kind: 'list', url: '/tasks?status=Completed' }, task())).toBe('/tasks?highlight=abc');
     });
 
     it('with no earlier page and nothing remembered, the task list', () => {

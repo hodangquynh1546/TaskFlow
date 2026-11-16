@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -9,6 +9,7 @@ import { ApiError } from '../../../core/http/api-error';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { burstConfetti } from '../../../core/motion/confetti';
+import { BrowseMemory, backTarget } from '../../../core/navigation/browse-memory';
 import { NotifyService } from '../../../core/notify/notify.service';
 import { STATUS_KEYS, TASK_STATUSES, TaskStatus } from '../../../shared/models/task.models';
 import { ConfirmService } from '../../../shared/ui/confirm.service';
@@ -35,7 +36,12 @@ export class TaskDetailComponent {
   private readonly confirm = inject(ConfirmService);
   protected readonly i18n = inject(I18nService);
 
+  private readonly memory = inject(BrowseMemory);
   readonly id = input.required<string>();
+
+  /** The page the user opened this task from: the back link goes there, and so does deleting the task. */
+  protected readonly back = computed(() => backTarget(this.memory.last()));
+  protected readonly backTree = computed(() => this.router.parseUrl(this.back().url));
 
   protected readonly resource = createTaskResource(this.id, this.tasks, inject(DestroyRef));
   protected readonly statuses = TASK_STATUSES;
@@ -75,7 +81,7 @@ export class TaskDetailComponent {
     this.tasks.delete(current.id).subscribe({
       next: () => {
         this.notify.success(this.i18n.t('toast.deleted'));
-        void this.router.navigateByUrl('/tasks');
+        void this.router.navigateByUrl(this.back().url);
       },
       error: (error: ApiError) => {
         this.busy.set(false);

@@ -23,12 +23,17 @@ export function pageBeforeCreate(previousUrl: string | null | undefined): string
  *    the task asked for by id so the planner can scroll to its block.
  *  - Opened from the task list (or from a task page reached from it): the list with the same filters and sort, asked for
  *    the task by id so it can open the page that holds it. If the filters hide the task, they are kept anyway.
- *  - Anywhere else (overview, profile): the task list, no filters.
+ *  - Opened from the overview or the profile (or from a task page reached from them): back to that page, as it was.
+ *  - Anywhere else: the task list, no filters.
  */
 export function whereAfterSave(previousUrl: string | null | undefined, memory: Browse, task: { id: string; startDate: string | null }): string {
   const previous = classifyBrowse(pageBeforeCreate(previousUrl));
   // A task page (detail, edit) in between carries no information about where the user was; the memory does.
   const origin = previous ?? memory;
+
+  if (origin.kind === 'page') {
+    return origin.url;
+  }
 
   if (origin.kind === 'schedule') {
     const params = new URLSearchParams(origin.url.split('?')[1] ?? '');

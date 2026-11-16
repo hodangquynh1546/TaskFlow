@@ -19,6 +19,9 @@
 
 .act {
   pointer-events: auto;
+  // Stays in view while the block's top is scrolled out of sight, like its text.
+  position: sticky;
+  top: var(--sticky-top, 4px);
   display: grid;
   place-items: center;
   width: 20px;

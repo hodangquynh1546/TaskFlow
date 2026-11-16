@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
-import { BrowseMemory, classifyBrowse } from './browse-memory';
+import { BrowseMemory, backTarget, classifyBrowse } from './browse-memory';
 
 describe('classifyBrowse', () => {
   it.each([
@@ -22,8 +22,24 @@ describe('classifyBrowse', () => {
     expect(classifyBrowse(url)).toBeNull();
   });
 
-  it.each([['/dashboard'], ['/'], ['/profile'], ['/login']])('%s resets to "no particular place"', (url) => {
+  it.each([['/dashboard'], ['/profile']])('%s is remembered as a page of its own, so a task opened from it can lead back to it', (url) => {
+    expect(classifyBrowse(url)).toEqual({ kind: 'page', url });
+  });
+
+  it.each([['/'], ['/login'], ['/register'], ['/nowhere']])('%s resets to "no particular place"', (url) => {
     expect(classifyBrowse(url)).toEqual({ kind: 'other' });
+  });
+});
+
+describe('backTarget', () => {
+  it.each([
+    [{ kind: 'list', url: '/tasks?status=Todo&page=2' }, '/tasks?status=Todo&page=2', 'nav.tasks'],
+    [{ kind: 'schedule', url: '/schedule?view=week&date=2026-11-18' }, '/schedule?view=week&date=2026-11-18', 'nav.schedule'],
+    [{ kind: 'page', url: '/dashboard' }, '/dashboard', 'nav.dashboard'],
+    [{ kind: 'page', url: '/profile' }, '/profile', 'nav.profile'],
+    [{ kind: 'other' }, '/tasks', 'nav.tasks'],
+  ] as const)('%j leads to %s, named %s', (browse, url, labelKey) => {
+    expect(backTarget(browse)).toEqual({ url, labelKey });
   });
 });
 
@@ -42,6 +58,9 @@ describe('BrowseMemory', () => {
     expect(memory.last()).toEqual({ kind: 'list', url: '/tasks?status=InProgress' });
 
     await router.navigateByUrl('/dashboard');
-    expect(memory.last()).toEqual({ kind: 'other' });
+    expect(memory.last()).toEqual({ kind: 'page', url: '/dashboard' });
+
+    await router.navigateByUrl('/tasks/42');
+    expect(memory.last()).toEqual({ kind: 'page', url: '/dashboard' }); // a task opened from the overview remembers the overview
   });
 });

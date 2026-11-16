@@ -1,6 +1,6 @@
 @use './timeline';
 
-:host { display: block; --week-head: 3.5rem; }
+:host { display: block; --week-head: 3.5rem; --sticky-top: calc(var(--week-head) + 6px); } // below the sticky day header
 
 // Exactly 7 hours show before scrolling: the header row, the margin above the first line, then seven rows.
 .week { overflow: hidden; box-shadow: var(--tf-shadow-panel); }

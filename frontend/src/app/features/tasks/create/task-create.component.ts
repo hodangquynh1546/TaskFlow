@@ -5,7 +5,7 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { ApiError } from '../../../core/http/api-error';
 import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
-import { BrowseMemory } from '../../../core/navigation/browse-memory';
+import { BrowseMemory, backTarget, classifyBrowse } from '../../../core/navigation/browse-memory';
 import { NotifyService } from '../../../core/notify/notify.service';
 import { TaskPayload } from '../../../shared/models/task.models';
 import { TaskFormComponent } from '../form/task-form.component';
@@ -19,7 +19,7 @@ import { pageBeforeCreate, whereAfterSave } from './previous-page';
   template: `
     <div class="tf-form-page">
       <div class="tf-form-page__head">
-        <a class="tf-back" routerLink="/tasks"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ 'tasks.title' | t }}</a>
+        <a class="tf-back" [routerLink]="backTree"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ back.labelKey | t }}</a>
         <header class="tf-page-header"><h1>{{ 'common.create' | t }}</h1></header>
       </div>
       <div class="tf-form-page__body">
@@ -38,6 +38,11 @@ export class TaskCreateComponent {
   /** Captured while the router is still navigating here, because afterwards it no longer remembers where we came from. */
   private readonly previousUrl = this.router.currentNavigation()?.previousNavigation?.finalUrl?.toString();
   private readonly returnTo = pageBeforeCreate(this.previousUrl);
+  /** The back link leads to the page the user came from, named for it ("Lịch", "Tổng quan"...). */
+  private readonly returnBrowse = classifyBrowse(this.returnTo);
+  protected readonly back = backTarget(this.returnBrowse ?? this.memory.last());
+  // Coming from a task page says nothing about where to go back to, so the remembered page is used then.
+  protected readonly backTree = this.router.parseUrl(this.returnBrowse ? this.returnTo : this.back.url);
 
   /** Bound from the query string by the router: set when the user starts from a free slot on the day calendar. */
   readonly date = input<string>();

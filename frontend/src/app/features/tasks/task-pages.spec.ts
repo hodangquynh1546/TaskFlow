@@ -94,7 +94,7 @@ describe('TaskCreateComponent', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/schedule?date=2026-11-12&highlight=new-1', { replaceUrl: true });
   });
 
-  it('after creating from the overview, opens the task list on the new task', async () => {
+  it('after creating from the overview, returns to the overview', async () => {
     const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
     const router = TestBed.inject(Router);
     vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/dashboard') } } as never);
@@ -105,7 +105,7 @@ describe('TaskCreateComponent', () => {
     submitForm(fixture.nativeElement);
     await settle(fixture);
 
-    expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=new-1', { replaceUrl: true });
+    expect(navigateByUrl).toHaveBeenCalledWith('/dashboard', { replaceUrl: true });
   });
 
   it('keeps the sort of the list the form was opened from', async () => {
@@ -184,6 +184,16 @@ describe('TaskCreateComponent', () => {
     expect(el.querySelector('.tf-form-page__head .tf-back')).not.toBeNull();
     expect(el.querySelector('.tf-form-page__head h1')).not.toBeNull();
     expect(el.querySelector('.tf-form-page__body tf-task-form')).not.toBeNull();
+  });
+
+  it('the back link and Cancel lead to the page the form was opened from, named for it', () => {
+    const ctx = setup(TaskCreateComponent);
+    const router = TestBed.inject(Router);
+    vi.spyOn(router, 'currentNavigation').mockReturnValue({ previousNavigation: { finalUrl: router.parseUrl('/schedule?view=week&date=2026-11-18') } } as never);
+    const el = ctx.mount().nativeElement as HTMLElement;
+
+    expect(el.querySelector('a.tf-back')!.getAttribute('href')).toBe('/schedule?view=week&date=2026-11-18');
+    expect(el.querySelector('a.tf-back')!.textContent!.trim()).toBe('Lịch');
   });
 
   it('has a back link and a heading', () => {
@@ -472,6 +482,51 @@ describe('TaskDetailComponent', () => {
       fixture.componentInstance['changeStatus']('InProgress');
 
       expect(tasks.changeStatus).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('where the back link and deleting lead', () => {
+    const loadFrom = async (openedFrom: string) => {
+      const ctx = setup(TaskDetailComponent, 't1');
+      ctx.tasks.get.mockReturnValue(of(aTask()));
+      TestBed.inject(BrowseMemory).note(openedFrom);
+      const fixture = ctx.mount();
+      await settle(fixture);
+      return { ...ctx, fixture, el: fixture.nativeElement as HTMLElement };
+    };
+
+    it.each([
+      ['/schedule?view=week&date=2026-11-18', 'Lịch'],
+      ['/dashboard', 'Tổng quan'],
+      ['/profile', 'Hồ sơ'],
+      ['/tasks?status=Todo&page=2', 'Công việc'],
+    ])('a task opened from %s leads back there, named %s', async (from, label) => {
+      const { el } = await loadFrom(from);
+      const back = el.querySelector('a.tf-back')!;
+
+      expect(back.getAttribute('href')).toBe(from);
+      expect(back.textContent!.trim()).toBe(label);
+    });
+
+    it('with nothing remembered (a link or a reload) the back link is the task list', async () => {
+      const { el } = await load();
+
+      expect(el.querySelector('a.tf-back')!.getAttribute('href')).toBe('/tasks');
+    });
+
+    it('deleting returns to the page the task was opened from, not always the list', async () => {
+      const { fixture, tasks, navigateByUrl } = await loadFrom('/schedule?view=week&date=2026-11-18');
+      tasks.delete.mockReturnValue(of(undefined));
+
+      await fixture.componentInstance['remove']();
+
+      expect(navigateByUrl).toHaveBeenCalledWith('/schedule?view=week&date=2026-11-18');
+    });
+
+    it('the memory survives the trip: from the overview, to the task, and the link still says the overview', async () => {
+      const { el } = await loadFrom('/dashboard');
+
+      expect(el.querySelector('a.tf-back')!.getAttribute('href')).toBe('/dashboard');
     });
   });
 

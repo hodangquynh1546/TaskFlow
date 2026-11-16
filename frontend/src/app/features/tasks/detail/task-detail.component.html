@@ -1,4 +1,4 @@
-<a class="tf-back" routerLink="/tasks"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ 'tasks.title' | t }}</a>
+<a class="tf-back" [routerLink]="backTree()"><span nz-icon nzType="arrow-left" nzTheme="outline" aria-hidden="true"></span>{{ back().labelKey | t }}</a>
 
 @switch (resource.state()) {
   @case ('notFound') { <tf-task-missing /> }
