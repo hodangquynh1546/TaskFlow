@@ -37,3 +37,20 @@
 
 .now { position: absolute; z-index: 3; left: -0.5rem; right: 0; height: 0; border-top: 3px solid var(--tf-bubblegum); pointer-events: none; }
 .now__dot { position: absolute; left: -6px; top: -9px; width: 14px; height: 14px; border: 2px solid var(--tf-edge); border-radius: 50%; background: var(--tf-bubblegum); }
+
+// The block's status/delete buttons appear on hover (devices that have one), while the block's link has the keyboard
+// focus, and, on a touch screen, once the block has been tapped (.block--selected). They stay while the pointer is on
+// them or the keyboard is inside. Until then they are hidden outright, so nothing can be pressed by accident.
+//
+// Hover is limited to devices that really hover: a touch screen applies :hover when a finger goes down, which would
+// show the buttons between the touch and its release, and the tap would land on whichever button is under the finger.
+@mixin shown { visibility: visible; opacity: 1; transform: none; transition-delay: 0s; }
+
+@media (hover: hover) {
+  .block:hover + tf-block-actions,
+  tf-block-actions:hover { @include shown; }
+}
+
+.block:focus-visible + tf-block-actions,
+.block--selected + tf-block-actions,
+tf-block-actions:focus-within { @include shown; }

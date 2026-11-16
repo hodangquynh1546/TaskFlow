@@ -1,0 +1,53 @@
+// The host overlays its block exactly (the parent gives it the same position and size) but lets clicks through to the
+// block's link everywhere except on the buttons themselves.
+:host {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 3px;
+  pointer-events: none;
+  // Hidden for real, not only transparent: an invisible button would still take a tap or a click, so touching the
+  // corner of a block could delete it. The planner's stylesheet shows the buttons (see _timeline.scss).
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 140ms ease, transform 160ms var(--tf-ease-pop), visibility 0s linear 140ms;
+}
+
+.act {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid var(--tf-edge);
+  border-radius: 50%;
+  color: var(--tf-edge);
+  cursor: pointer;
+  box-shadow: 1px 1px 0 var(--tf-shadow-color);
+  transition: transform 120ms var(--tf-ease-pop);
+
+  svg { width: 10px; height: 10px; }
+  &:hover:not(:disabled) { transform: scale(1.18); }
+  &:disabled { cursor: progress; opacity: 0.6; }
+  // The status the task already has: drawn pressed in, so pressing it again clearly does nothing new.
+  &[aria-pressed='true'] { box-shadow: inset 1px 1px 0 var(--tf-shadow-color); outline: 2px solid var(--tf-edge); outline-offset: 1px; }
+}
+
+.act--doing { background: var(--tf-lemon); }
+.act--done { background: var(--tf-mint); }
+.act--delete { background: var(--tf-alarm); color: #fff; }
+
+// A finger needs more room than a pointer.
+@media (pointer: coarse) {
+  .act { width: 28px; height: 28px; svg { width: 14px; height: 14px; } }
+  :host { gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host, .act { transition: none; }
+}

@@ -72,7 +72,7 @@ export class TaskEditComponent {
     this.saving.set(true);
     this.tasks.update(this.id(), payload).subscribe({
       next: (task) => {
-        this.notify.success(this.i18n.t('toast.saved'));
+        this.notify.success(task.alsoCreated ? this.i18n.t('toast.seriesCreated', { count: task.alsoCreated + 1 }) : this.i18n.t('toast.saved'));
         // Editing can move a task to another place in the list (a new start time, a new status), so it is looked up again.
         void this.router.navigateByUrl(whereAfterSave(this.previousUrl, this.memory.last(), task), { replaceUrl: true });
       },

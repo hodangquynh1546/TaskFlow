@@ -10,14 +10,14 @@
         </div>
       }
 
-      <div class="week__axis" [style.height.px]="gridHeight" aria-hidden="true">
+      <div class="week__axis" [style.height.px]="gridHeight()" aria-hidden="true">
         @for (hour of hours; track hour) {
           <span class="axis__label" [style.top.px]="hourTop(hour)">{{ clock(hour * 60) }}</span>
         }
       </div>
 
       @for (col of columns(); track col.day) {
-        <div class="week__col" role="group" [attr.aria-label]="col.longLabel" [class.week__col--today]="col.isToday" [style.height.px]="gridHeight">
+        <div class="week__col" role="group" [attr.aria-label]="col.longLabel" [class.week__col--today]="col.isToday" [style.height.px]="gridHeight()">
           @for (hour of hours; track hour) {
             <div class="hour" [style.top.px]="hourTop(hour)">
               <button type="button" class="hour__slot" tabindex="-1" aria-hidden="true" (click)="createAt.emit({ day: col.day, minute: hour * 60 })">
@@ -27,15 +27,19 @@
           }
 
           @for (block of col.layout.blocks; track block.task.id; let i = $index) {
-            <a class="block" [class]="'block block--' + block.task.status" [class.block--high]="block.task.priority === 'High'"
+            <a class="block" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" (click)="blockTap.emit(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
                [class.block--estimated]="block.estimated" [class.block--flash]="block.task.id === flashId()" [class.block--short]="isShort(block)"
-               [routerLink]="['/tasks', block.task.id]" [attr.aria-label]="label(block)" [attr.title]="label(block)"
+               [routerLink]="link(block.task.id)" [attr.aria-label]="label(block)" [attr.title]="label(block)"
                [style.top.px]="top(block)" [style.height.px]="height(block)"
                [style.left.%]="(block.lane / block.lanes) * 100" [style.width.%]="100 / block.lanes"
                [style.--i]="i" [style.--dir]="direction()">
               <span class="block__title">{{ block.task.title }}</span>
               <span class="block__time">{{ clock(block.startMinute) }}–{{ clock(block.endMinute) }}</span>
             </a>
+            <tf-block-actions [status]="block.task.status" [busy]="busyIds().has(block.task.id)"
+                              [style.top.px]="top(block)" [style.height.px]="height(block)"
+                              [style.left.%]="(block.lane / block.lanes) * 100" [style.width.%]="100 / block.lanes"
+                              (choose)="statusChosen.emit({ task: block.task, status: $event.status, event: $event.event })" (remove)="removeRequested.emit(block.task)" />
           }
 
           @if (col.isToday) {

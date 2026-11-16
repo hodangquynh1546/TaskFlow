@@ -9,15 +9,19 @@ import { BehaviorSubject, EMPTY, combineLatest, forkJoin, switchMap, tap } from 
 import { catchError, map } from 'rxjs/operators';
 
 import { ApiError } from '../../core/http/api-error';
+import { burstConfetti } from '../../core/motion/confetti';
+import { NotifyService } from '../../core/notify/notify.service';
+import { ConfirmService } from '../../shared/ui/confirm.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
-import { Task } from '../../shared/models/task.models';
+import { Task, TaskStatus } from '../../shared/models/task.models';
 import { ErrorStateComponent } from '../../shared/ui/error-state.component';
 import { formatDuration } from '../../shared/util/duration';
 import { formatDay, parseDay } from '../tasks/task-query';
 import { TaskService } from '../tasks/task.service';
 import { blockLabel, clock } from './block-label';
-import { DayLayout, PX_PER_MINUTE, ScheduledBlock, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
+import { DayLayout, HOUR_HEIGHT, PX_PER_MINUTE, SHORT_BLOCK_HEIGHT, ScheduledBlock, VISIBLE_HOURS_DAY, VISIBLE_HOURS_WEEK, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
+import { BlockActionsComponent } from './block-actions.component';
 import { WeekGridComponent } from './week-grid.component';
 
 export { PX_PER_MINUTE };
@@ -28,6 +32,10 @@ const FLASH_MS = 2400;
 /** Matches `.timeline { margin: 16px ... }` and the hour label that sticks out 12px above its line. */
 const TIMELINE_MARGIN_TOP = 16;
 const HOUR_LABEL_ROOM = 14;
+/** The summary line's bottom margin, the week header (3.5rem) and the room the page leaves under the planner. */
+const SUMMARY_GAP = 16;
+const WEEK_HEADER = 56;
+const PAGE_BOTTOM = 56;
 
 interface DayData {
   scheduled: Task[];
@@ -37,7 +45,8 @@ interface DayData {
 @Component({
   selector: 'tf-schedule',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, ErrorStateComponent, TranslatePipe, WeekGridComponent],
+  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, BlockActionsComponent, ErrorStateComponent, TranslatePipe, WeekGridComponent],
+  host: { '(window:resize)': 'fit()', '(document:click)': 'dismissSelection($event)' },
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
 })
@@ -45,6 +54,8 @@ export class ScheduleComponent {
   private readonly tasks = inject(TaskService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly notify = inject(NotifyService);
+  private readonly confirm = inject(ConfirmService);
   private readonly injector = inject(Injector);
   protected readonly i18n = inject(I18nService);
 
@@ -53,6 +64,15 @@ export class ScheduleComponent {
 
   /** "week" shows Monday to Sunday around the day; anything else is the single-day planner. */
   readonly view = input<string>();
+
+  /** True on a device with no hover (a touch screen): there, buttons come from tapping a block. */
+  protected readonly touch = signal(window.matchMedia('(hover: none)').matches);
+
+  /** On a touch screen: the block that was tapped once, whose buttons are showing. */
+  protected readonly selectedId = signal<string | null>(null);
+
+  /** Ids of the tasks whose status change or deletion is in flight. */
+  protected readonly busy = signal<ReadonlySet<string>>(new Set());
 
   /** A task to point at: set after saving one from here, so the planner scrolls to its block. */
   readonly highlight = input<string>();
@@ -68,6 +88,10 @@ export class ScheduleComponent {
   protected readonly selected = computed(() => parseDay(this.day()));
   /** True when the screen already shows today: the day itself, or the week that contains it. */
   protected readonly atToday = computed(() => (this.isWeek() ? this.week().includes(this.today()) : this.isToday()));
+  /** Pixels per hour: the default, or larger so the visible hours fill a tall window (see fit()). */
+  protected readonly hourHeight = signal(HOUR_HEIGHT);
+  private readonly pxPerMinute = computed(() => this.hourHeight() / 60);
+  private readonly summaryElement = viewChild<ElementRef<HTMLElement>>('summaryLine');
   protected readonly isWeek = computed(() => this.view() === 'week');
   protected readonly week = computed(() => weekDays(this.day()));
   protected readonly weekLayouts = computed(() => layoutWeek(this.week(), this.data()?.scheduled ?? []));
@@ -92,7 +116,7 @@ export class ScheduleComponent {
     const { startHour, endHour } = this.layout();
     return Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   });
-  protected readonly gridHeight = computed(() => (this.layout().endHour - this.layout().startHour) * 60 * PX_PER_MINUTE);
+  protected readonly gridHeight = computed(() => (this.layout().endHour - this.layout().startHour) * 60 * this.pxPerMinute());
 
   /** "Planned 5 h 30 min across 6 tasks." plus a note when blocks overlap. In week view, the whole week's totals. */
   protected readonly summary = computed(() => {
@@ -120,7 +144,7 @@ export class ScheduleComponent {
     }
     const minute = this.now().getHours() * 60 + this.now().getMinutes();
     const { startHour, endHour } = this.layout();
-    return minute >= startHour * 60 && minute <= endHour * 60 ? (minute - startHour * 60) * PX_PER_MINUTE : null;
+    return minute >= startHour * 60 && minute <= endHour * 60 ? (minute - startHour * 60) * this.pxPerMinute() : null;
   });
 
   private readonly reload$ = new BehaviorSubject<void>(undefined);
@@ -137,7 +161,7 @@ export class ScheduleComponent {
       return Math.max(0, TIMELINE_MARGIN_TOP + this.hourTop(this.now().getHours()) - HOUR_LABEL_ROOM);
     }
     const first = blocks.length ? Math.min(...blocks.map((b) => this.top(b))) : null;
-    return first === null ? 0 : Math.max(0, TIMELINE_MARGIN_TOP + first - 60 * PX_PER_MINUTE);
+    return first === null ? 0 : Math.max(0, TIMELINE_MARGIN_TOP + first - 60 * this.pxPerMinute());
   });
 
   constructor() {
@@ -145,7 +169,10 @@ export class ScheduleComponent {
     const anchor = computed(() => (this.isWeek() ? `week:${this.week()[0]}` : `day:${this.day()}`));
     combineLatest([toObservable(anchor), this.reload$])
       .pipe(
-        tap(() => this.state.set('loading')),
+        tap(() => {
+          this.state.set('loading');
+          this.selectedId.set(null);
+        }),
         switchMap(([key]) => {
           const day = key.slice(key.indexOf(':') + 1);
           this.direction.set(this.lastDay && day < this.lastDay ? -1 : 1);
@@ -209,6 +236,12 @@ export class ScheduleComponent {
       }
     });
 
+    afterNextRender(() => this.fit(), { injector: this.injector });
+    effect(() => {
+      this.isWeek();
+      afterNextRender(() => this.fit(), { injector: this.injector });
+    });
+
     // Keeps the "now" line and "today" honest while the page stays open, including across midnight.
     const timer = setInterval(() => {
       this.now.set(new Date());
@@ -218,6 +251,111 @@ export class ScheduleComponent {
       clearInterval(timer);
       clearTimeout(this.flashTimer);
     });
+  }
+
+  /**
+   * A tap on a block. With a mouse the link just opens the task (the buttons come from hovering). On a touch screen
+   * there is no hover, so the first tap only shows the buttons and a second tap on the same block opens the task.
+   */
+  protected tapBlock(id: string): void {
+    if (this.touch() && this.selectedId() !== id) {
+      this.selectedId.set(id);
+    }
+  }
+
+  /**
+   * Where a block leads. On a touch screen a block that has not been tapped yet leads nowhere (no link at all: a
+   * RouterLink navigates whatever a click handler does), so the first tap can only show its buttons.
+   */
+  protected link(id: string): string[] | null {
+    return this.touch() && this.selectedId() !== id ? null : ['/tasks', id];
+  }
+
+  /** A tap anywhere that is not a block or its buttons puts the buttons away again. */
+  protected dismissSelection(event: Event): void {
+    if (this.selectedId() !== null && !(event.target as Element | null)?.closest('a.block, tf-block-actions')) {
+      this.selectedId.set(null);
+    }
+  }
+
+  protected isBusy(id: string): boolean {
+    return this.busy().has(id);
+  }
+
+  /** Yellow or green button on a block. Choosing the status the task already has does nothing. */
+  protected chooseStatus(task: Task, status: TaskStatus, event?: Event): void {
+    if (task.status === status || this.isBusy(task.id)) {
+      return;
+    }
+    this.markBusy(task.id, true);
+    this.tasks.changeStatus(task.id, status).subscribe({
+      next: (changed) => {
+        this.markBusy(task.id, false);
+        // Changed in place: reloading would blink the planner and throw away where the user had scrolled to.
+        this.data.update((d) => d && { ...d, scheduled: d.scheduled.map((t) => (t.id === changed.id ? changed : t)) });
+        this.notify.success(
+          changed.next
+            ? this.i18n.t('toast.nextCreated', { when: this.i18n.formatDateTime(changed.next.startDate) })
+            : this.i18n.t(status === 'Completed' ? 'toast.completed' : 'toast.toDoing'),
+        );
+        if (status === 'Completed') {
+          const box = (event?.currentTarget as HTMLElement | null)?.getBoundingClientRect();
+          burstConfetti(box && { x: box.left + box.width / 2, y: box.top + box.height / 2 });
+        }
+      },
+      error: (error: ApiError) => {
+        this.markBusy(task.id, false);
+        this.notify.error(error.message);
+      },
+    });
+  }
+
+  /** Red button on a block: the same confirmation as deleting from the list. */
+  protected async remove(task: Task): Promise<void> {
+    if (this.isBusy(task.id) || !(await this.confirm.confirmDelete(task.title))) {
+      return;
+    }
+    this.markBusy(task.id, true);
+    this.tasks.delete(task.id).subscribe({
+      next: () => {
+        this.markBusy(task.id, false);
+        this.data.update((d) => d && { ...d, scheduled: d.scheduled.filter((t) => t.id !== task.id) });
+        this.notify.success(this.i18n.t('toast.deleted'));
+      },
+      error: (error: ApiError) => {
+        this.markBusy(task.id, false);
+        this.notify.error(error.message);
+      },
+    });
+  }
+
+  private markBusy(id: string, busy: boolean): void {
+    this.busy.update((set) => {
+      const next = new Set(set);
+      if (busy) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  /**
+   * Sizes the hours so the visible ones (8 in the day view, 7 in the week) reach the bottom of the window instead of
+   * leaving a blank strip under the planner on a tall one. Measured from the summary line just above the planner.
+   * Phones keep the default: the page scrolls there. Where nothing is laid out (tests) the default stays too.
+   */
+  protected fit(): void {
+    const top = this.summaryElement()?.nativeElement.getBoundingClientRect().bottom ?? 0;
+    if (top <= 0 || window.innerWidth < 1024) {
+      this.hourHeight.set(HOUR_HEIGHT);
+      return;
+    }
+    const week = this.isWeek();
+    // Below the summary: its margin, the panel's own 16px of top margin, the week header, and the page's bottom padding.
+    const fixed = SUMMARY_GAP + TIMELINE_MARGIN_TOP + (week ? WEEK_HEADER : 0);
+    this.hourHeight.set(fitHourHeight(window.innerHeight - top - PAGE_BOTTOM, week ? VISIBLE_HOURS_WEEK : VISIBLE_HOURS_DAY, fixed));
   }
 
   /** Lights the block for a moment, then removes the request from the address so a reload does not repeat it. */
@@ -269,20 +407,20 @@ export class ScheduleComponent {
   }
 
   protected top(block: ScheduledBlock): number {
-    return (block.startMinute - this.layout().startHour * 60) * PX_PER_MINUTE;
+    return (block.startMinute - this.layout().startHour * 60) * this.pxPerMinute();
   }
 
   protected height(block: ScheduledBlock): number {
-    return Math.max((block.endMinute - block.startMinute) * PX_PER_MINUTE, MIN_BLOCK_HEIGHT);
+    return Math.max((block.endMinute - block.startMinute) * this.pxPerMinute(), MIN_BLOCK_HEIGHT);
   }
 
   /** Too short for two lines: the title and the time share one row so neither is cut off. */
   protected isShort(block: ScheduledBlock): boolean {
-    return this.height(block) < 36;
+    return this.height(block) < SHORT_BLOCK_HEIGHT;
   }
 
   protected hourTop(hour: number): number {
-    return (hour - this.layout().startHour) * 60 * PX_PER_MINUTE;
+    return (hour - this.layout().startHour) * 60 * this.pxPerMinute();
   }
 
   protected label(block: ScheduledBlock): string {

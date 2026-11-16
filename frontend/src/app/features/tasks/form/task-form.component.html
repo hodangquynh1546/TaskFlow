@@ -89,7 +89,7 @@
 
     <nz-form-item>
       <nz-form-label nzFor="repeat">{{ 'form.repeat' | t }}</nz-form-label>
-      <nz-form-control>
+      <nz-form-control [nzExtra]="repeating() ? ('repeat.createsAhead' | t) : ''">
         <nz-select nzId="repeat" formControlName="repeat" class="repeat-kind">
           <nz-option nzValue="none" [nzLabel]="'repeat.none' | t" />
           @for (option of repeatOptions; track option) {

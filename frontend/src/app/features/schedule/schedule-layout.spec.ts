@@ -1,5 +1,5 @@
 import { Task } from '../../shared/models/task.models';
-import { DEFAULT_BLOCK_MINUTES, layoutDay, layoutWeek, snapToQuarter, startOfWeek, weekDays } from './schedule-layout';
+import { DEFAULT_BLOCK_MINUTES, HOUR_HEIGHT, MAX_HOUR_HEIGHT, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, startOfWeek, weekDays } from './schedule-layout';
 
 let seq = 0;
 const task = (h: number, m: number, duration: number | null, patch: Partial<Task> = {}): Task => ({
@@ -198,5 +198,26 @@ describe('layoutWeek', () => {
     const layouts = layoutWeek(days, [task(9, 0, 60, { startDate: null }), onDay(20, 9, 60)]);
 
     expect(layouts.every((l) => l.blocks.length === 0)).toBe(true);
+  });
+});
+
+describe('fitHourHeight', () => {
+  it('makes the visible rows exactly fill the room that is left', () => {
+    // 700px left, 16px of margin above the first line, 8 rows: (700 - 16) / 8 = 85.5
+    expect(fitHourHeight(700, 8, 16)).toBe(86);
+    expect(fitHourHeight(700 + 8 * 10, 8, 16)).toBe(96);
+  });
+
+  it('counts what the week header takes before dividing among the rows', () => {
+    expect(fitHourHeight(700, 7, 16 + 56)).toBe(90);
+  });
+
+  it('never squeezes the rows below the default on a short window: the page scrolls instead', () => {
+    expect(fitHourHeight(300, 8, 16)).toBe(HOUR_HEIGHT);
+    expect(fitHourHeight(-50, 8, 16)).toBe(HOUR_HEIGHT);
+  });
+
+  it('stops growing on a very tall window', () => {
+    expect(fitHourHeight(5000, 8, 16)).toBe(MAX_HOUR_HEIGHT);
   });
 });

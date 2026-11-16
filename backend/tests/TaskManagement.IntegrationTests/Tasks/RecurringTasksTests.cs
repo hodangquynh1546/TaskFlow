@@ -7,7 +7,7 @@ using TaskManagement.IntegrationTests.Infrastructure;
 
 namespace TaskManagement.IntegrationTests.Tasks;
 
-/// <summary>Repeating tasks: finishing one creates the next, once.</summary>
+/// <summary>Repeating tasks: saving one creates its next occurrences up front; finishing the last of them carries the series on, once.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class RecurringTasksTests : IDisposable
 {
@@ -41,6 +41,15 @@ public sealed class RecurringTasksTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
+
+    /// <summary>Tasks a repeating one makes when it is saved: itself plus eleven more.</summary>
+    private const int Series = 12;
+
+    private static Guid IdOf(JsonElement task) => task.GetProperty("id").GetGuid();
+
+    /// <summary>The open occurrence that starts last: the one whose finishing carries the series on.</summary>
+    private static async Task<Guid> LastOpenAsync(TestUser user) =>
+        IdOf((await All(user)).Last(t => t.GetProperty("status").GetString() != "Completed"));
 
     private static async Task<List<JsonElement>> All(TestUser user) =>
         (await user.GetJsonAsync("/api/tasks?pageSize=50&sortBy=startDate&sortDir=asc")).GetProperty("items").EnumerateArray().ToList();
@@ -115,64 +124,206 @@ public sealed class RecurringTasksTests : IDisposable
         Assert.Equal(JsonValueKind.Null, removed.GetProperty("recurrence").ValueKind);
     }
 
-    // --- Finishing -------------------------------------------------------------------------------
+    // --- Saving creates the series ---------------------------------------------------------------
 
     [Fact]
-    public async Task Finishing_a_repeating_task_creates_the_next_occurrence_with_the_same_details_and_says_so()
+    public async Task Saving_a_repeating_task_creates_the_next_occurrences_right_away_with_the_same_details()
     {
         var user = await _api.RegisterAsync();
         var start = Now.AddHours(2);
+
         var created = await user.CreateTaskAsync(new
         {
             title = "Uống thuốc", description = "sau ăn", priority = "High", startDate = start, durationMinutes = 15, recurrence = Daily(),
         });
 
-        var finished = await Json(await Finish(user, created.GetProperty("id").GetGuid()));
-
-        var next = finished.GetProperty("next");
-        Assert.Equal(start.AddDays(1), next.GetProperty("startDate").GetDateTimeOffset());
+        Assert.Equal(Series - 1, created.GetProperty("alsoCreated").GetInt32());
         var tasks = await All(user);
-        Assert.Equal(2, tasks.Count);
-        var spawned = tasks.Single(t => t.GetProperty("id").GetGuid() == next.GetProperty("id").GetGuid());
-        Assert.Equal("Uống thuốc", spawned.GetProperty("title").GetString());
-        Assert.Equal("sau ăn", spawned.GetProperty("description").GetString());
-        Assert.Equal("High", spawned.GetProperty("priority").GetString());
-        Assert.Equal("Todo", spawned.GetProperty("status").GetString());
-        Assert.Equal(15, spawned.GetProperty("durationMinutes").GetInt32());
-        Assert.Equal(start.AddDays(1).AddMinutes(15), spawned.GetProperty("dueDate").GetDateTimeOffset());
-        Assert.Equal("Daily", spawned.GetProperty("recurrence").GetProperty("frequency").GetString());
-        Assert.Equal("Completed", tasks.Single(t => t.GetProperty("id").GetGuid() == created.GetProperty("id").GetGuid()).GetProperty("status").GetString());
+        Assert.Equal(Series, tasks.Count);
+        Assert.Equal(Enumerable.Range(0, Series).Select(d => start.AddDays(d)), tasks.Select(t => t.GetProperty("startDate").GetDateTimeOffset()));
+        Assert.All(tasks, t =>
+        {
+            Assert.Equal("Uống thuốc", t.GetProperty("title").GetString());
+            Assert.Equal("sau ăn", t.GetProperty("description").GetString());
+            Assert.Equal("High", t.GetProperty("priority").GetString());
+            Assert.Equal("Todo", t.GetProperty("status").GetString());
+            Assert.Equal(15, t.GetProperty("durationMinutes").GetInt32());
+            Assert.Equal("Daily", t.GetProperty("recurrence").GetProperty("frequency").GetString());
+            Assert.Equal(t.GetProperty("startDate").GetDateTimeOffset().AddMinutes(15), t.GetProperty("dueDate").GetDateTimeOffset());
+        });
     }
 
     [Fact]
-    public async Task The_chain_goes_on_each_finished_occurrence_makes_the_next()
+    public async Task Only_the_last_occurrence_is_left_to_carry_the_series_on()
+    {
+        var user = await _api.RegisterAsync();
+        await user.CreateTaskAsync(new { title = "Chuỗi", startDate = Now.AddHours(1), recurrence = Daily() });
+
+        await using var db = _postgres.CreateContext();
+        var stored = await db.Tasks.Where(t => t.UserId == user.Id).OrderBy(t => t.StartDate).ToListAsync();
+        Assert.All(stored.Take(Series - 1), t => Assert.True(t.RecurrenceSpawned));
+        Assert.False(stored[^1].RecurrenceSpawned);
+        Assert.All(stored, t => Assert.Equal(user.Id, t.UserId));
+    }
+
+    [Fact]
+    public async Task A_task_that_does_not_repeat_creates_nothing_extra()
+    {
+        var user = await _api.RegisterAsync();
+
+        var created = await user.CreateTaskAsync(new { title = "Một lần", startDate = Now.AddHours(1) });
+
+        Assert.Equal(JsonValueKind.Null, created.GetProperty("alsoCreated").ValueKind);
+        Assert.Single(await All(user));
+    }
+
+    [Fact]
+    public async Task A_series_with_an_end_day_creates_only_what_fits_before_it()
     {
         var user = await _api.RegisterAsync();
         var start = Now.AddHours(1);
-        var current = (await user.CreateTaskAsync(new { title = "Chuỗi", startDate = start, recurrence = Daily() })).GetProperty("id").GetGuid();
 
-        for (var day = 1; day <= 3; day++)
+        var created = await user.CreateTaskAsync(new { title = "Có hạn chót", startDate = start, recurrence = Daily(until: start.AddDays(2).AddHours(5)) });
+
+        Assert.Equal(2, created.GetProperty("alsoCreated").GetInt32());
+        Assert.Equal(3, (await All(user)).Count);
+    }
+
+    [Fact]
+    public async Task A_start_in_the_past_does_not_bring_back_past_occurrences()
+    {
+        var user = await _api.RegisterAsync();
+        var past = Now.AddDays(-3);
+
+        await user.CreateTaskAsync(new { title = "Đã bắt đầu", startDate = past, recurrence = Daily() });
+
+        var starts = (await All(user)).Select(t => t.GetProperty("startDate").GetDateTimeOffset()).ToList();
+        Assert.Equal(Series, starts.Count);
+        Assert.Equal(past, starts[0]); // the task itself is where the user put it
+        Assert.All(starts.Skip(1), s => Assert.True(s > Now));
+    }
+
+    [Fact]
+    public async Task A_task_saved_as_finished_does_not_start_a_series()
+    {
+        var user = await _api.RegisterAsync();
+
+        await user.CreateTaskAsync(new { title = "Đã xong", status = "Completed", startDate = Now.AddHours(1), recurrence = Daily() });
+
+        Assert.Single(await All(user));
+    }
+
+    [Fact]
+    public async Task Weekly_on_chosen_days_uses_the_users_own_weekdays()
+    {
+        var user = await _api.RegisterAsync();
+        // 02:00 on a Monday in Vietnam (UTC+7), a week from now at least, so it is still to come.
+        var local = Now.ToOffset(TimeSpan.FromHours(7)).Date.AddDays(8);
+        var monday = local.AddDays(-(((int)local.DayOfWeek + 6) % 7));
+        var start = new DateTimeOffset(monday.AddDays(7).AddHours(2), TimeSpan.FromHours(7));
+
+        await user.CreateTaskAsync(new
+        {
+            title = "Thứ Hai và thứ Tư", startDate = start,
+            recurrence = new { frequency = "Weekly", interval = 1, weekdays = 1 | 4, until = (DateTimeOffset?)null, utcOffsetMinutes = 420 },
+        });
+
+        var starts = (await All(user)).Select(t => t.GetProperty("startDate").GetDateTimeOffset().ToOffset(TimeSpan.FromHours(7))).Take(4).ToList();
+        Assert.Equal([start, start.AddDays(2), start.AddDays(7), start.AddDays(9)], starts);
+        Assert.Equal([DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Monday, DayOfWeek.Wednesday], starts.Select(x => x.DayOfWeek));
+    }
+
+    [Fact]
+    public async Task Turning_a_repeat_on_while_editing_creates_the_following_occurrences_too()
+    {
+        var user = await _api.RegisterAsync();
+        var start = Now.AddDays(1);
+        var id = IdOf(await user.CreateTaskAsync(new { title = "Sau mới lặp", startDate = start }));
+
+        var updated = await Json(await user.Client.PutAsJsonAsync($"/api/tasks/{id}", new { title = "Sau mới lặp", priority = "Medium", status = "Todo", startDate = start, recurrence = Daily() }));
+
+        Assert.Equal(Series - 1, updated.GetProperty("alsoCreated").GetInt32());
+        Assert.Equal(Series, (await All(user)).Count);
+    }
+
+    [Fact]
+    public async Task Editing_a_task_that_already_repeats_creates_nothing_more()
+    {
+        var user = await _api.RegisterAsync();
+        var start = Now.AddDays(1);
+        var id = IdOf(await user.CreateTaskAsync(new { title = "Đã lặp", startDate = start, recurrence = Daily() }));
+
+        var updated = await Json(await user.Client.PutAsJsonAsync($"/api/tasks/{id}", new { title = "Đã lặp (sửa)", priority = "Medium", status = "Todo", startDate = start, recurrence = Daily(2) }));
+
+        Assert.Equal(JsonValueKind.Null, updated.GetProperty("alsoCreated").ValueKind);
+        Assert.Equal(Series, (await All(user)).Count);
+    }
+
+    // --- Finishing -------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Finishing_the_last_occurrence_creates_the_next_one_and_says_so()
+    {
+        var user = await _api.RegisterAsync();
+        var start = Now.AddHours(2);
+        await user.CreateTaskAsync(new { title = "Uống thuốc", priority = "High", startDate = start, durationMinutes = 15, recurrence = Daily() });
+
+        var finished = await Json(await Finish(user, await LastOpenAsync(user)));
+
+        var next = finished.GetProperty("next");
+        Assert.Equal(start.AddDays(Series), next.GetProperty("startDate").GetDateTimeOffset());
+        var tasks = await All(user);
+        Assert.Equal(Series + 1, tasks.Count);
+        var spawned = tasks.Single(t => IdOf(t) == next.GetProperty("id").GetGuid());
+        Assert.Equal("Uống thuốc", spawned.GetProperty("title").GetString());
+        Assert.Equal("High", spawned.GetProperty("priority").GetString());
+        Assert.Equal("Todo", spawned.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Finishing_an_earlier_occurrence_creates_nothing_because_the_next_one_already_exists()
+    {
+        var user = await _api.RegisterAsync();
+        await user.CreateTaskAsync(new { title = "Giữa chuỗi", startDate = Now.AddHours(1), recurrence = Daily() });
+        var first = IdOf((await All(user))[0]);
+
+        var finished = await Json(await Finish(user, first));
+
+        Assert.Equal(JsonValueKind.Null, finished.GetProperty("next").ValueKind);
+        Assert.Equal(Series, (await All(user)).Count);
+    }
+
+    [Fact]
+    public async Task The_chain_goes_on_each_finished_last_occurrence_makes_the_next()
+    {
+        var user = await _api.RegisterAsync();
+        var start = Now.AddHours(1);
+        await user.CreateTaskAsync(new { title = "Chuỗi", startDate = start, recurrence = Daily() });
+        var current = await LastOpenAsync(user);
+
+        for (var step = 0; step < 3; step++)
         {
             var next = (await Json(await Finish(user, current))).GetProperty("next");
-            Assert.Equal(start.AddDays(day), next.GetProperty("startDate").GetDateTimeOffset());
+            Assert.Equal(start.AddDays(Series + step), next.GetProperty("startDate").GetDateTimeOffset());
             current = next.GetProperty("id").GetGuid();
         }
 
-        Assert.Equal(4, (await All(user)).Count);
+        Assert.Equal(Series + 3, (await All(user)).Count);
     }
 
     [Fact]
     public async Task Re_opening_and_finishing_again_does_not_make_a_second_next_occurrence()
     {
         var user = await _api.RegisterAsync();
-        var id = (await user.CreateTaskAsync(new { title = "Một lần thôi", startDate = Now.AddHours(1), recurrence = Daily() })).GetProperty("id").GetGuid();
+        await user.CreateTaskAsync(new { title = "Một lần thôi", startDate = Now.AddHours(1), recurrence = Daily() });
+        var id = await LastOpenAsync(user);
 
         await Finish(user, id);
         await Reopen(user, id);
         var again = await Json(await Finish(user, id));
 
         Assert.Equal(JsonValueKind.Null, again.GetProperty("next").ValueKind);
-        Assert.Equal(2, (await All(user)).Count);
+        Assert.Equal(Series + 1, (await All(user)).Count);
     }
 
     [Fact]
@@ -180,23 +331,25 @@ public sealed class RecurringTasksTests : IDisposable
     {
         var user = await _api.RegisterAsync();
         var start = Now.AddHours(1);
-        var id = (await user.CreateTaskAsync(new { title = "Qua PUT", startDate = start, recurrence = Daily() })).GetProperty("id").GetGuid();
+        await user.CreateTaskAsync(new { title = "Qua PUT", startDate = start, recurrence = Daily() });
+        var last = (await All(user)).Last();
+        var lastStart = last.GetProperty("startDate").GetDateTimeOffset();
 
-        var updated = await Json(await user.Client.PutAsJsonAsync($"/api/tasks/{id}", new { title = "Qua PUT", priority = "Medium", status = "Completed", startDate = start, recurrence = Daily() }));
+        var updated = await Json(await user.Client.PutAsJsonAsync($"/api/tasks/{IdOf(last)}", new { title = "Qua PUT", priority = "Medium", status = "Completed", startDate = lastStart, recurrence = Daily() }));
 
-        Assert.Equal(start.AddDays(1), updated.GetProperty("next").GetProperty("startDate").GetDateTimeOffset());
-        Assert.Equal(2, (await All(user)).Count);
+        Assert.Equal(lastStart.AddDays(1), updated.GetProperty("next").GetProperty("startDate").GetDateTimeOffset());
+        Assert.Equal(Series + 1, (await All(user)).Count);
     }
 
     [Fact]
     public async Task Moving_to_in_progress_creates_nothing_only_finishing_does()
     {
         var user = await _api.RegisterAsync();
-        var id = (await user.CreateTaskAsync(new { title = "Đang làm", startDate = Now.AddHours(1), recurrence = Daily() })).GetProperty("id").GetGuid();
+        await user.CreateTaskAsync(new { title = "Đang làm", startDate = Now.AddHours(1), recurrence = Daily() });
 
-        await user.Client.PatchAsJsonAsync($"/api/tasks/{id}/status", new { status = "InProgress" });
+        await user.Client.PatchAsJsonAsync($"/api/tasks/{await LastOpenAsync(user)}/status", new { status = "InProgress" });
 
-        Assert.Single(await All(user));
+        Assert.Equal(Series, (await All(user)).Count);
     }
 
     [Fact]
@@ -204,12 +357,11 @@ public sealed class RecurringTasksTests : IDisposable
     {
         var user = await _api.RegisterAsync();
         var start = Now.AddHours(1);
-        var id = (await user.CreateTaskAsync(new { title = "Có hạn chót", startDate = start, recurrence = Daily(until: start.AddDays(1).AddHours(5)) })).GetProperty("id").GetGuid();
+        await user.CreateTaskAsync(new { title = "Có hạn chót", startDate = start, recurrence = Daily(until: start.AddDays(1).AddHours(5)) });
 
-        var second = (await Json(await Finish(user, id))).GetProperty("next");
-        var third = await Json(await Finish(user, second.GetProperty("id").GetGuid()));
+        var finished = await Json(await Finish(user, await LastOpenAsync(user)));
 
-        Assert.Equal(JsonValueKind.Null, third.GetProperty("next").ValueKind);
+        Assert.Equal(JsonValueKind.Null, finished.GetProperty("next").ValueKind);
         Assert.Equal(2, (await All(user)).Count);
     }
 
@@ -228,27 +380,6 @@ public sealed class RecurringTasksTests : IDisposable
     }
 
     [Fact]
-    public async Task Weekly_on_chosen_days_uses_the_users_own_weekdays()
-    {
-        var user = await _api.RegisterAsync();
-        // 02:00 on a Monday in Vietnam (UTC+7), a week from now at least, so it is still to come.
-        var local = Now.ToOffset(TimeSpan.FromHours(7)).Date.AddDays(8);
-        var monday = local.AddDays(-(((int)local.DayOfWeek + 6) % 7));
-        var start = new DateTimeOffset(monday.AddDays(7).AddHours(2), TimeSpan.FromHours(7));
-        var id = (await user.CreateTaskAsync(new
-        {
-            title = "Thứ Hai và thứ Tư", startDate = start,
-            recurrence = new { frequency = "Weekly", interval = 1, weekdays = 1 | 4, until = (DateTimeOffset?)null, utcOffsetMinutes = 420 },
-        })).GetProperty("id").GetGuid();
-
-        var next = (await Json(await Finish(user, id))).GetProperty("next").GetProperty("startDate").GetDateTimeOffset().ToOffset(TimeSpan.FromHours(7));
-
-        Assert.Equal(DayOfWeek.Wednesday, next.DayOfWeek);
-        Assert.Equal(2, next.Hour);
-        Assert.Equal(start.AddDays(2), next);
-    }
-
-    [Fact]
     public async Task Finishing_someone_elses_repeating_task_is_a_404_and_creates_nothing()
     {
         var mine = await _api.RegisterAsync();
@@ -257,7 +388,7 @@ public sealed class RecurringTasksTests : IDisposable
 
         await (await Finish(mine, theirTask)).ReadProblemAsync(404);
 
-        Assert.Single(await All(theirs));
+        Assert.Equal(Series, (await All(theirs)).Count);
         Assert.Empty(await All(mine));
     }
 
@@ -265,7 +396,8 @@ public sealed class RecurringTasksTests : IDisposable
     public async Task The_next_occurrence_belongs_to_the_same_user_in_the_database()
     {
         var user = await _api.RegisterAsync();
-        var id = (await user.CreateTaskAsync(new { title = "Chủ", startDate = Now.AddHours(1), recurrence = Daily() })).GetProperty("id").GetGuid();
+        await user.CreateTaskAsync(new { title = "Chủ", startDate = Now.AddHours(1), recurrence = Daily() });
+        var id = await LastOpenAsync(user);
 
         var next = (await Json(await Finish(user, id))).GetProperty("next").GetProperty("id").GetGuid();
 

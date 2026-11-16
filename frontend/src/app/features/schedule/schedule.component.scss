@@ -18,11 +18,12 @@
 
 .board__panel { max-width: 52rem; } // one day is a narrow column of blocks; stretched across the whole page it reads poorly
 .board__panel { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
-.board__scroll { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+// Exactly 8 hours show before scrolling: the margin above the first line plus eight rows.
+.board__scroll { max-height: calc(16px + 8 * var(--hour-h)); overflow-y: auto; overscroll-behavior: contain; }
 
 .timeline { position: relative; margin: 16px var(--tf-space-4) 16px 4rem; } // room above the first hour so its label is not clipped
 
-.hour { position: absolute; left: 0; right: 0; height: 84px; border-top: 2px dashed var(--tf-line); }
+.hour { position: absolute; left: 0; right: 0; height: var(--hour-h); border-top: 2px dashed var(--tf-line); }
 .hour__label { position: absolute; left: -3.75rem; top: -0.75rem; width: 3.2rem; text-align: right; color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-weight: 600; font-variant-numeric: tabular-nums; background: var(--tf-paper); }
 
 .skeleton { display: flex; flex-direction: column; gap: var(--tf-space-3); }

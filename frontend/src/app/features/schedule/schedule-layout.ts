@@ -1,8 +1,19 @@
 import { Task } from '../../shared/models/task.models';
 import { formatDay, parseDay } from '../tasks/task-query';
 
-/** Pixels per minute on the timeline: an hour is 84px tall, so a 15 minute block is still readable. */
-export const PX_PER_MINUTE = 1.4;
+/**
+ * Pixels per minute on the timeline: an hour is 72px tall. That is what lets the planner show 8 hours (7 in the week
+ * view, which also has a header row) in a window of about 800px without scrolling. The CSS reads it as --hour-h.
+ */
+export const PX_PER_MINUTE = 1.2;
+export const HOUR_HEIGHT = 60 * PX_PER_MINUTE;
+/** The tallest an hour grows to on a very tall window; beyond it more rows simply show. */
+export const MAX_HOUR_HEIGHT = 120;
+/** Hours of the day visible at once, before scrolling. */
+export const VISIBLE_HOURS_DAY = 8;
+export const VISIBLE_HOURS_WEEK = 7;
+/** A block shorter than this has no room for two lines, so its title and time share one row. */
+export const SHORT_BLOCK_HEIGHT = 42;
 
 /** What a task with a start time but no length is drawn as: the smallest block that is still readable. */
 export const DEFAULT_BLOCK_MINUTES = 30;
@@ -128,4 +139,15 @@ export function layoutWeek(days: readonly string[], tasks: readonly Task[]): Day
     }
   }
   return days.map((day) => layoutDay(byDay.get(day) ?? []));
+}
+
+/**
+ * The hour height that makes `rows` hours exactly fill the room left in the window: `availablePx` is what is
+ * left below the top of the planner, `fixedPx` what the panel spends on things that are not hour rows (the margin
+ * above the first line, the week header). Never smaller than the default, so a short window scrolls instead of
+ * squeezing the rows.
+ */
+export function fitHourHeight(availablePx: number, rows: number, fixedPx: number): number {
+  const fitted = (availablePx - fixedPx) / rows;
+  return Math.round(Math.min(MAX_HOUR_HEIGHT, Math.max(HOUR_HEIGHT, fitted)));
 }

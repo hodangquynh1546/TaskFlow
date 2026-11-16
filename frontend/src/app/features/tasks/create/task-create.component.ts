@@ -55,7 +55,7 @@ export class TaskCreateComponent {
     this.saving.set(true);
     this.tasks.create(payload).subscribe({
       next: (task) => {
-        this.notify.success(this.i18n.t('toast.created'));
+        this.notify.success(task.alsoCreated ? this.i18n.t('toast.seriesCreated', { count: task.alsoCreated + 1 }) : this.i18n.t('toast.created'));
         // Replaces the form in the history, so Back does not land on an empty form for a task that already exists.
         void this.router.navigateByUrl(whereAfterSave(this.previousUrl, this.memory.last(), task), { replaceUrl: true });
       },

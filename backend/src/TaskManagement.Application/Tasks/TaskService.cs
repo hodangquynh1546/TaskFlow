@@ -118,8 +118,9 @@ internal sealed class TaskService(
         var task = TaskItem.Create(currentUser.UserId, request.Title, request.Description, request.Priority, request.Status, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes,
             request.Recurrence?.ToDomain());
         db.Tasks.Add(task);
+        var following = task.Status == TaskItemStatus.Completed ? [] : CreateFollowing(task, now);
         await db.SaveChangesAsync(cancellationToken);
-        return TaskDto.From(task, now);
+        return TaskDto.From(task, now, alsoCreated: following.Count);
     }
 
     public async Task<TaskDto> UpdateAsync(Guid id, UpdateTaskRequest request, CancellationToken cancellationToken)
@@ -129,11 +130,14 @@ internal sealed class TaskService(
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         var now = clock.GetUtcNow();
         var wasFinished = task.Status == TaskItemStatus.Completed;
+        var wasRepeating = task.Recurrence is not null;
         task.Update(request.Title, request.Description, request.Priority!.Value, request.Status!.Value, request.StartDate, TaskSchedule.DueFor(request.StartDate, request.DurationMinutes, request.DueDate), now, request.DurationMinutes,
             request.Recurrence?.ToDomain());
+        // Turning repetition on for a task that did not repeat does what creating it with a repeat does.
+        var following = !wasRepeating && task.Status != TaskItemStatus.Completed ? CreateFollowing(task, now) : [];
         var next = !wasFinished && task.Status == TaskItemStatus.Completed ? SpawnNext(task, now) : null;
         await db.SaveChangesAsync(cancellationToken);
-        return TaskDto.From(task, now, next);
+        return TaskDto.From(task, now, next, following.Count);
     }
 
     public async Task<TaskDto> ChangeStatusAsync(Guid id, ChangeStatusRequest request, CancellationToken cancellationToken)
@@ -154,6 +158,46 @@ internal sealed class TaskService(
         var task = await OwnTasks().FirstOrDefaultAsync(t => t.Id == id, cancellationToken) ?? throw NotFound();
         db.Tasks.Remove(task);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>How many tasks a repeating one makes when it is saved: itself plus the next ones.</summary>
+    private const int SeriesSize = 12;
+
+    /// <summary>
+    /// Saving a repeating task creates its next occurrences right away (up to <see cref="SeriesSize"/> in all, or until the
+    /// series ends), so they show up in the list and the calendar without waiting for the previous one to be finished. Every
+    /// one but the last is marked as already followed; finishing the last one carries the series on (<see cref="SpawnNext"/>).
+    /// </summary>
+    private List<TaskItem> CreateFollowing(TaskItem first, DateTimeOffset now)
+    {
+        if (first.Recurrence is not { } rule || first.StartDate is not { } start)
+        {
+            return [];
+        }
+
+        var starts = rule.FollowingStarts(start, now, SeriesSize - 1);
+        var created = new List<TaskItem>(starts.Count);
+        foreach (var (index, nextStart) in starts.Index())
+        {
+            var task = TaskItem.Create(
+                first.UserId, first.Title, first.Description, first.Priority, TaskItemStatus.Todo, nextStart,
+                TaskSchedule.DueFor(nextStart, first.DurationMinutes, null), now, first.DurationMinutes,
+                rule with { }); // its own copy: EF cannot let two tasks own one repeat object
+            if (index < starts.Count - 1)
+            {
+                task.MarkNextCreated();
+            }
+
+            created.Add(task);
+        }
+
+        if (created.Count > 0)
+        {
+            first.MarkNextCreated();
+            db.Tasks.AddRange(created);
+        }
+
+        return created;
     }
 
     /// <summary>

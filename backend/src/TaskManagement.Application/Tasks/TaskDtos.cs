@@ -17,10 +17,12 @@ public sealed record TaskDto(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     RecurrenceDto? Recurrence = null,
-    NextTaskDto? Next = null)
+    NextTaskDto? Next = null,
+    int? AlsoCreated = null)
 {
     /// <param name="next">Only given in the answer to the call that finished a repeating task, to say what was created.</param>
-    public static TaskDto From(TaskItem task, DateTimeOffset now, TaskItem? next = null) => new(
+    /// <param name="alsoCreated">Only given when saving a repeating task created its following occurrences up front: how many.</param>
+    public static TaskDto From(TaskItem task, DateTimeOffset now, TaskItem? next = null, int alsoCreated = 0) => new(
         task.Id,
         task.Title,
         task.Description,
@@ -33,7 +35,8 @@ public sealed record TaskDto(
         task.CreatedAt,
         task.UpdatedAt,
         RecurrenceDto.From(task.Recurrence),
-        next is { StartDate: { } nextStart } ? new NextTaskDto(next.Id, nextStart) : null);
+        next is { StartDate: { } nextStart } ? new NextTaskDto(next.Id, nextStart) : null,
+        alsoCreated > 0 ? alsoCreated : null);
 }
 
 /// <summary>How a task repeats. Weekdays is a bit mask, Monday = 1 ... Sunday = 64.</summary>

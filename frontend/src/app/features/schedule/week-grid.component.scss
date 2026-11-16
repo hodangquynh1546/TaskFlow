@@ -1,9 +1,10 @@
 @use './timeline';
 
-:host { display: block; }
+:host { display: block; --week-head: 3.5rem; }
 
+// Exactly 7 hours show before scrolling: the header row, the margin above the first line, then seven rows.
 .week { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
-.week__scroll { max-height: 70vh; overflow: auto; overscroll-behavior: contain; }
+.week__scroll { max-height: calc(var(--week-head) + 16px + 7 * var(--hour-h)); overflow: auto; overscroll-behavior: contain; }
 
 // One grid: a time axis, then seven day columns. Headers stick to the top and the axis to the left, so both stay
 // readable while the week scrolls in either direction on a small screen.
@@ -18,7 +19,7 @@
 .week__head { position: sticky; top: 0; z-index: 6; background: var(--tf-paper); border-bottom: 2px solid var(--tf-edge); }
 .week__corner { left: 0; z-index: 7; }
 
-.week__head { display: flex; align-items: baseline; justify-content: center; gap: var(--tf-space-2); padding: var(--tf-space-3) var(--tf-space-2); border-left: 2px dashed var(--tf-line); color: var(--tf-ink-soft); font-weight: 600; }
+.week__head { display: flex; align-items: center; justify-content: center; gap: var(--tf-space-2); height: var(--week-head); padding: 0 var(--tf-space-2); border-left: 2px dashed var(--tf-line); color: var(--tf-ink-soft); font-weight: 600; }
 .week__date { font-family: var(--tf-font-display); font-size: var(--tf-text-h3); font-weight: 800; color: var(--tf-ink); }
 // Today is marked by a filled, outlined date as well as colour, so it reads without telling hues apart.
 .week__head--today .week__date { padding: 0 var(--tf-space-3); border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-control); background: var(--tf-tangerine); color: var(--tf-on-color); }
@@ -30,7 +31,7 @@
 .week__col { position: relative; margin: 16px 0; border-left: 2px dashed var(--tf-line); }
 .week__col--today { background: var(--tf-tangerine-tint); }
 
-.hour { position: absolute; left: 0; right: 0; height: 84px; border-top: 2px dashed var(--tf-line); }
+.hour { position: absolute; left: 0; right: 0; height: var(--hour-h); border-top: 2px dashed var(--tf-line); }
 
 // Narrow columns: smaller type, and the time wraps under the title only when the block is tall enough for it.
 .block { padding: 2px var(--tf-space-2); font-size: var(--tf-text-caption); }

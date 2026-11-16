@@ -81,6 +81,24 @@ public sealed record Recurrence(RecurrenceFrequency Frequency, int Interval, int
         return next;
     }
 
+    /// <summary>
+    /// The starts of the next <paramref name="count"/> occurrences after <paramref name="start"/>, each the first one after
+    /// <paramref name="after"/>, so a series saved with a start in the past does not begin with a run of past-dated tasks.
+    /// Fewer come back when the series ends first.
+    /// </summary>
+    public IReadOnlyList<DateTimeOffset> FollowingStarts(DateTimeOffset start, DateTimeOffset after, int count)
+    {
+        var starts = new List<DateTimeOffset>();
+        var current = start;
+        while (starts.Count < count && NextStartAfter(current, after) is { } next)
+        {
+            starts.Add(next);
+            current = next;
+        }
+
+        return starts;
+    }
+
     private DateTime NextWeekly(DateTime local)
     {
         if (Weekdays == 0)

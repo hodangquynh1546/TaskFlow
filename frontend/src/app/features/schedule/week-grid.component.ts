@@ -1,10 +1,13 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, untracked, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { BlockActionsComponent } from './block-actions.component';
+
 import { I18nService } from '../../core/i18n/i18n.service';
+import { Task, TaskStatus } from '../../shared/models/task.models';
 import { parseDay } from '../tasks/task-query';
 import { blockLabel, clock } from './block-label';
-import { DayLayout, DEFAULT_END_HOUR, DEFAULT_START_HOUR, PX_PER_MINUTE, ScheduledBlock } from './schedule-layout';
+import { DayLayout, DEFAULT_END_HOUR, DEFAULT_START_HOUR, HOUR_HEIGHT, SHORT_BLOCK_HEIGHT, ScheduledBlock } from './schedule-layout';
 
 /** Matches the top margin of a column and the hour label that sticks out above its line. */
 const COLUMN_MARGIN_TOP = 16;
@@ -28,7 +31,7 @@ export interface WeekColumn {
 @Component({
   selector: 'tf-week-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, BlockActionsComponent],
   templateUrl: './week-grid.component.html',
   styleUrl: './week-grid.component.scss',
 })
@@ -47,10 +50,22 @@ export class WeekGridComponent {
   readonly highlight = input<string>();
   /** -1 when the user went to an earlier week, 1 for a later one: blocks slide in from that side. */
   readonly direction = input(1);
+  /** Pixels per hour, set by the planner so the visible hours fill the window. */
+  readonly hourHeight = input(HOUR_HEIGHT);
+  private readonly pxPerMinute = computed(() => this.hourHeight() / 60);
+  /** Ids of tasks with a change in flight: their buttons wait. */
+  readonly busyIds = input<ReadonlySet<string>>(new Set());
+  /** The block tapped once on a touch screen, whose buttons are showing. */
+  readonly selectedId = input<string | null>(null);
+  /** True on a touch screen: a block that was not tapped yet has no link, so the first tap can only show its buttons. */
+  readonly tapToSelect = input(false);
+  readonly blockTap = output<string>();
+  readonly statusChosen = output<{ task: Task; status: TaskStatus; event: Event }>();
+  readonly removeRequested = output<Task>();
   readonly createAt = output<{ day: string; minute: number }>();
 
   protected readonly hours = HOURS;
-  protected readonly gridHeight = (DEFAULT_END_HOUR - DEFAULT_START_HOUR) * 60 * PX_PER_MINUTE;
+  protected readonly gridHeight = computed(() => (DEFAULT_END_HOUR - DEFAULT_START_HOUR) * this.hourHeight());
   protected readonly clock = clock;
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
@@ -73,7 +88,7 @@ export class WeekGridComponent {
   });
 
   /** The red "now" line, only in today's column. */
-  protected readonly nowTop = computed(() => (this.now().getHours() * 60 + this.now().getMinutes()) * PX_PER_MINUTE);
+  protected readonly nowTop = computed(() => (this.now().getHours() * 60 + this.now().getMinutes()) * this.pxPerMinute());
 
   constructor() {
     // Opens on the part of the week that matters: the current hour when today is in this week, otherwise an hour
@@ -96,26 +111,30 @@ export class WeekGridComponent {
 
   private openingScroll(columns: readonly WeekColumn[]): number {
     if (columns.some((c) => c.isToday)) {
-      return Math.max(0, COLUMN_MARGIN_TOP + this.now().getHours() * 60 * PX_PER_MINUTE - HOUR_LABEL_ROOM);
+      return Math.max(0, COLUMN_MARGIN_TOP + this.now().getHours() * 60 * this.pxPerMinute() - HOUR_LABEL_ROOM);
     }
     const starts = columns.flatMap((c) => c.layout.blocks.map((b) => b.startMinute));
-    return starts.length ? Math.max(0, COLUMN_MARGIN_TOP + (Math.min(...starts) - 60) * PX_PER_MINUTE) : 0;
+    return starts.length ? Math.max(0, COLUMN_MARGIN_TOP + (Math.min(...starts) - 60) * this.pxPerMinute()) : 0;
+  }
+
+  protected link(id: string): string[] | null {
+    return this.tapToSelect() && this.selectedId() !== id ? null : ['/tasks', id];
   }
 
   protected hourTop(hour: number): number {
-    return hour * 60 * PX_PER_MINUTE;
+    return hour * 60 * this.pxPerMinute();
   }
 
   protected top(block: ScheduledBlock): number {
-    return block.startMinute * PX_PER_MINUTE;
+    return block.startMinute * this.pxPerMinute();
   }
 
   protected height(block: ScheduledBlock): number {
-    return Math.max((block.endMinute - block.startMinute) * PX_PER_MINUTE, 26);
+    return Math.max((block.endMinute - block.startMinute) * this.pxPerMinute(), 26);
   }
 
   protected isShort(block: ScheduledBlock): boolean {
-    return this.height(block) < 36;
+    return this.height(block) < SHORT_BLOCK_HEIGHT;
   }
 
   protected label(block: ScheduledBlock): string {

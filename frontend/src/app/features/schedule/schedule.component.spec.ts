@@ -4,6 +4,8 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { Subject, of, throwError } from 'rxjs';
 
 import { ApiError } from '../../core/http/api-error';
+import { NotifyService } from '../../core/notify/notify.service';
+import { ConfirmService } from '../../shared/ui/confirm.service';
 import { PagedResult, Task } from '../../shared/models/task.models';
 import { UI_TEST_PROVIDERS, aTask } from '../tasks/test-support';
 import { TaskService } from '../tasks/task.service';
@@ -16,12 +18,14 @@ const block = (id: string, h: number, m: number, duration: number | null, patch:
   aTask({ id, title: `Việc ${id}`, startDate: at(h, m), durationMinutes: duration, ...patch });
 
 async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled) };
+  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn() };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
       provideRouter([{ path: 'schedule', component: ScheduleComponent }, { path: 'tasks/new', component: ScheduleComponent }], withComponentInputBinding()),
       { provide: TaskService, useValue: service },
+      { provide: NotifyService, useValue: notify },
+      { provide: ConfirmService, useValue: confirm },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -38,12 +42,14 @@ async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(page
 }
 
 async function setupWithComponent(url: string, scheduled: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled) };
+  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn() };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
       provideRouter([{ path: 'schedule', component: ScheduleComponent }], withComponentInputBinding()),
       { provide: TaskService, useValue: service },
+      { provide: NotifyService, useValue: notify },
+      { provide: ConfirmService, useValue: confirm },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -53,7 +59,339 @@ async function setupWithComponent(url: string, scheduled: unknown = of(paged([])
   return { harness: Object.assign(harness, { component }) };
 }
 
+const notify = { success: vi.fn(), error: vi.fn() };
+const confirm = { confirmDelete: vi.fn().mockResolvedValue(true) };
+
 const blocks = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('a.block')];
+
+describe('ScheduleComponent, fitting the window', () => {
+  const originalWidth = window.innerWidth;
+  const originalHeight = window.innerHeight;
+  const resize = (width: number, height: number) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+  };
+  afterEach(() => {
+    resize(originalWidth, originalHeight);
+    vi.restoreAllMocks();
+  });
+
+  /** Pretends the summary line, just above the planner, ends `bottom` px from the top of the window. */
+  async function mountWith(url: string, width: number, height: number, bottom: number) {
+    resize(width, height);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ bottom, top: bottom - 20, height: 20, width: 100, left: 0, right: 100, x: 0, y: bottom - 20, toJSON: () => ({}) });
+    const { harness } = await setupWithComponent(url);
+    return harness.component as unknown as { fit(): void; hourHeight(): number };
+  }
+
+  it('stretches the hours of the day so 8 of them fill a tall window down to its bottom', async () => {
+    // 950 - 200 (summary bottom) - 56 (page bottom) = 694; minus 16 + 16 of margins = 662 for 8 rows
+    const planner = await mountWith('/schedule?date=2026-11-12', 1470, 950, 200);
+
+    expect(planner.hourHeight()).toBe(83);
+  });
+
+  it('does the same for the week with 7 rows and its header', async () => {
+    // 694 - 16 - 16 - 56 (header) = 606 for 7 rows
+    const planner = await mountWith('/schedule?date=2026-11-12&view=week', 1470, 950, 200);
+
+    expect(planner.hourHeight()).toBe(87);
+  });
+
+  it('keeps the default on a window too short to grow', async () => {
+    const planner = await mountWith('/schedule?date=2026-11-12', 1470, 600, 200);
+
+    expect(planner.hourHeight()).toBe(72);
+  });
+
+  it('keeps the default on a phone, where the page scrolls', async () => {
+    const planner = await mountWith('/schedule?date=2026-11-12', 390, 1200, 200);
+
+    expect(planner.hourHeight()).toBe(72);
+  });
+
+  it('draws blocks at the stretched scale, so the axis and the blocks always agree', async () => {
+    resize(1470, 950);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ bottom: 200, top: 180, height: 20, width: 100, left: 0, right: 100, x: 0, y: 180, toJSON: () => ({}) });
+    const { el, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    await settle();
+    const [a] = blocks(el);
+    const hour = Number.parseFloat((el.querySelector<HTMLElement>('.board')!.style.getPropertyValue('--hour-h')));
+
+    expect(hour).toBe(83);
+    expect(Number.parseFloat(a.style.top)).toBeCloseTo(9 * hour, 5);
+    expect(Number.parseFloat(a.style.height)).toBeCloseTo(hour, 5);
+  });
+});
+
+describe('ScheduleComponent, buttons on a block', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    notify.error.mockClear();
+    confirm.confirmDelete.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const acts = (el: HTMLElement) => ({
+    doing: el.querySelector<HTMLButtonElement>('tf-block-actions .act--doing')!,
+    done: el.querySelector<HTMLButtonElement>('tf-block-actions .act--done')!,
+    del: el.querySelector<HTMLButtonElement>('tf-block-actions .act--delete')!,
+  });
+
+  it('puts a yellow, a green and a red button right after each block, outside its link, each with a name', async () => {
+    const { el } = await setup(undefined, of(paged([block('a', 9, 0, 60), block('b', 11, 0, 60)])));
+
+    expect(el.querySelectorAll('tf-block-actions')).toHaveLength(2);
+    expect(el.querySelector('a.block + tf-block-actions')).not.toBeNull();
+    expect(el.querySelector('a.block tf-block-actions')).toBeNull(); // a link may not contain buttons
+    const { doing, done, del } = acts(el);
+    expect([doing, done, del].map((b) => b.getAttribute('aria-label'))).toEqual(['Chuyển sang Đang làm', 'Đánh dấu hoàn thành', 'Xóa công việc']);
+  });
+
+  it('is laid over its own block: same place and size', async () => {
+    const { el } = await setup(undefined, of(paged([block('a', 9, 0, 60), block('b', 9, 30, 60)])));
+    const pairs = [...el.querySelectorAll<HTMLElement>('a.block')].map((a) => [a, a.nextElementSibling as HTMLElement]);
+
+    for (const [a, tools] of pairs) {
+      expect([tools.style.top, tools.style.height, tools.style.left, tools.style.width]).toEqual([a.style.top, a.style.height, a.style.left, a.style.width]);
+    }
+  });
+
+  it('yellow sets "Đang làm" and the block changes in place, without reloading the planner', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    service.changeStatus.mockReturnValue(of(aTask({ id: 'a', title: 'Việc a', startDate: at(9), durationMinutes: 60, status: 'InProgress' })));
+
+    acts(el).doing.click();
+    await settle();
+
+    expect(service.changeStatus).toHaveBeenCalledWith('a', 'InProgress');
+    expect(blocks(el)[0].classList.contains('block--InProgress')).toBe(true);
+    expect(service.forDay).toHaveBeenCalledTimes(1);
+    expect(notify.success).toHaveBeenCalledWith('Đã chuyển sang Đang làm');
+  });
+
+  it('green sets "Hoàn thành", and the block is drawn as finished', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    service.changeStatus.mockReturnValue(of(aTask({ id: 'a', title: 'Việc a', startDate: at(9), durationMinutes: 60, status: 'Completed' })));
+
+    acts(el).done.click();
+    await settle();
+
+    expect(service.changeStatus).toHaveBeenCalledWith('a', 'Completed');
+    expect(blocks(el)[0].classList.contains('block--Completed')).toBe(true);
+    expect(notify.success).toHaveBeenCalledWith('Đã đánh dấu hoàn thành');
+  });
+
+  it('finishing a repeating task says when the next one is', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    service.changeStatus.mockReturnValue(of(aTask({ id: 'a', startDate: at(9), status: 'Completed', next: { id: 'n', startDate: new Date(2026, 10, 24, 9, 0).toISOString() } })));
+
+    acts(el).done.click();
+    await settle();
+
+    expect(notify.success.mock.calls[0][0]).toMatch(/^Đã hoàn thành\. Việc kế tiếp:/);
+  });
+
+  it('the button of the status the task already has is shown pressed and does nothing', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60, { status: 'InProgress' })])));
+    const { doing, done } = acts(el);
+
+    expect(doing.getAttribute('aria-pressed')).toBe('true');
+    expect(done.getAttribute('aria-pressed')).toBe('false');
+    doing.click();
+    await settle();
+
+    expect(service.changeStatus).not.toHaveBeenCalled();
+  });
+
+  it('shows the server message and leaves the block alone when the change fails', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    service.changeStatus.mockReturnValue(throwError(() => new ApiError(500, 'Máy chủ lỗi.')));
+
+    acts(el).done.click();
+    await settle();
+
+    expect(notify.error).toHaveBeenCalledWith('Máy chủ lỗi.');
+    expect(blocks(el)[0].classList.contains('block--Completed')).toBe(false);
+    expect(acts(el).done.disabled).toBe(false); // free to try again
+  });
+
+  it('red asks first, and only deletes once confirmed, taking the block off the planner', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60), block('b', 11, 0, 60)])));
+    service.delete.mockReturnValue(of(undefined));
+
+    acts(el).del.click();
+    await settle();
+
+    expect(confirm.confirmDelete).toHaveBeenCalledWith('Việc a');
+    expect(service.delete).toHaveBeenCalledWith('a');
+    expect(blocks(el).map((b) => b.querySelector('.block__title')!.textContent)).toEqual(['Việc b']);
+    expect(notify.success).toHaveBeenCalledWith('Đã xóa công việc');
+  });
+
+  it('keeps the task when the deletion is not confirmed', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    confirm.confirmDelete.mockResolvedValue(false);
+
+    acts(el).del.click();
+    await settle();
+
+    expect(service.delete).not.toHaveBeenCalled();
+    expect(blocks(el)).toHaveLength(1);
+  });
+
+  it('keeps the task and says why when the deletion fails', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    service.delete.mockReturnValue(throwError(() => new ApiError(404, 'Không tìm thấy.')));
+
+    acts(el).del.click();
+    await settle();
+
+    expect(notify.error).toHaveBeenCalledWith('Không tìm thấy.');
+    expect(blocks(el)).toHaveLength(1);
+  });
+
+  it('every button waits while its task has a change in flight, so a double click sends one request', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    const slow = new Subject<Task>();
+    service.changeStatus.mockReturnValue(slow);
+
+    acts(el).done.click();
+    await settle();
+    expect(acts(el).done.disabled && acts(el).doing.disabled && acts(el).del.disabled).toBe(true);
+    acts(el).done.click();
+
+    expect(service.changeStatus).toHaveBeenCalledTimes(1);
+    slow.next(aTask({ id: 'a', startDate: at(9), status: 'Completed' }));
+    await settle();
+    expect(acts(el).done.disabled).toBe(false);
+  });
+});
+
+describe('ScheduleComponent, tapping a block on a touch screen', () => {
+  let restoreMedia: () => void;
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    // A device with no hover: what a phone or a tablet reports.
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query.includes('hover: none') || query.includes('prefers-reduced-motion') })) as typeof window.matchMedia;
+    restoreMedia = () => (window.matchMedia = original);
+  });
+  afterEach(() => {
+    restoreMedia();
+    vi.useRealTimers();
+  });
+
+  const tap = (el: Element) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  it('a block that was not tapped yet is not a link, so the first tap cannot open the task', async () => {
+    const { el } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    const [a] = blocks(el);
+
+    expect(a.getAttribute('href')).toBeNull();
+    expect(a.getAttribute('role')).toBe('button');
+    expect(a.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('the first tap selects the block and shows its buttons instead of opening the task', async () => {
+    const { el, router, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    tap(blocks(el)[0]);
+    await settle();
+
+    expect(blocks(el)[0].classList.contains('block--selected')).toBe(true);
+    expect(navigate).not.toHaveBeenCalled();
+    // Selected, it is the link again, and the buttons next to it are the ones the stylesheet shows.
+    expect(blocks(el)[0].getAttribute('href')).toBe('/tasks/a');
+    expect(blocks(el)[0].nextElementSibling!.tagName).toBe('TF-BLOCK-ACTIONS');
+  });
+
+  it('a second tap on the same block opens the task', async () => {
+    const { el, router, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    tap(blocks(el)[0]);
+    await settle();
+    tap(blocks(el)[0]);
+    await settle();
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(String(navigate.mock.calls[0][0])).toBe('/tasks/a');
+  });
+
+  it('tapping another block moves the selection to it', async () => {
+    const { el, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60), block('b', 11, 0, 60)])));
+
+    tap(blocks(el)[0]);
+    await settle();
+    tap(blocks(el)[1]);
+    await settle();
+
+    expect(blocks(el).map((b) => b.classList.contains('block--selected'))).toEqual([false, true]);
+  });
+
+  it('tapping anywhere else puts the buttons away, but tapping the buttons does not', async () => {
+    const { el, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    tap(blocks(el)[0]);
+    await settle();
+
+    tap(el.querySelector('tf-block-actions .act--doing')!);
+    await settle();
+    expect(blocks(el)[0].classList.contains('block--selected')).toBe(true);
+
+    tap(document.body);
+    await settle();
+    expect(blocks(el)[0].classList.contains('block--selected')).toBe(false);
+  });
+
+  it('going to another day clears the selection', async () => {
+    const { el, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60)])));
+    tap(blocks(el)[0]);
+    await settle();
+
+    el.querySelector<HTMLButtonElement>('button[aria-label="Ngày sau"]')!.click();
+    await settle();
+
+    expect(el.querySelector('.block--selected')).toBeNull();
+  });
+
+  it('works the same in the week grid', async () => {
+    const original = window.matchMedia;
+    const service = { forDay: vi.fn((day: string) => of(paged(day === '2026-11-12' ? [block('a', 9, 0, 60, { startDate: at(9) })] : []))), changeStatus: vi.fn(), delete: vi.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        ...UI_TEST_PROVIDERS,
+        provideRouter([{ path: 'schedule', component: ScheduleComponent }], withComponentInputBinding()),
+        { provide: TaskService, useValue: service },
+        { provide: NotifyService, useValue: notify },
+        { provide: ConfirmService, useValue: confirm },
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/schedule?view=week&date=2026-11-12', ScheduleComponent);
+    for (let i = 0; i < 3; i++) {
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    }
+    const el = harness.routeNativeElement as HTMLElement;
+    const grid = () => el.querySelector<HTMLElement>('.week__col a.block')!;
+
+    expect(grid().getAttribute('href')).toBeNull();
+    tap(grid());
+    for (let i = 0; i < 3; i++) {
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    }
+
+    expect(grid().classList.contains('block--selected')).toBe(true);
+    expect(grid().getAttribute('href')).toBe('/tasks/a');
+    window.matchMedia = original;
+  });
+});
 
 describe('ScheduleComponent', () => {
   // "Today" is pinned so the tests never depend on the date they happen to run on.
@@ -133,12 +471,13 @@ describe('ScheduleComponent', () => {
     });
 
     it('a block too short for two lines puts the title and time on one row so nothing is cut off', async () => {
-      const { el } = await setup(undefined, of(paged([block('s', 9, 0, 15), block('l', 11, 0, 60), block('m', 13, 0, 30)])));
-      const [short, long, half] = blocks(el);
+      const { el } = await setup(undefined, of(paged([block('s', 9, 0, 15), block('l', 11, 0, 60), block('m', 13, 0, 30), block('n', 15, 0, 45)])));
+      const [short, long, half, threeQuarters] = blocks(el);
 
       expect(short.classList.contains('block--short')).toBe(true);
       expect(long.classList.contains('block--short')).toBe(false);
-      expect(half.classList.contains('block--short')).toBe(false); // 30 minutes still fits two lines
+      expect(half.classList.contains('block--short')).toBe(true); // 30 minutes is 36px: not enough for two lines
+      expect(threeQuarters.classList.contains('block--short')).toBe(false); // 45 minutes is 54px: it fits two
     });
 
     it('a task with a start but no length is drawn as an estimate', async () => {
@@ -334,8 +673,8 @@ describe('ScheduleComponent', () => {
   });
 
   describe('where the timeline opens', () => {
-    // 00:00 is the first line, 84 px per hour, 16 px of margin above it and 14 px for the label that sticks out.
-    const opensAt = (hour: number) => 16 + hour * 84 - 14;
+    // 00:00 is the first line, an hour is 60 * PX_PER_MINUTE px, with 16 px of margin above it and 14 px for the label that sticks out.
+    const opensAt = (hour: number) => 16 + hour * 60 * PX_PER_MINUTE - 14;
 
     it('today: the current hour is the first line, so nothing needs scrolling up to', async () => {
       vi.setSystemTime(new Date(2026, 10, 20, 13, 20));

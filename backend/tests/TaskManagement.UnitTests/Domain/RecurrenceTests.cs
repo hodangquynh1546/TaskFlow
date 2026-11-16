@@ -167,4 +167,43 @@ public sealed class RecurrenceTests
         Assert.Equal(rule, task.Recurrence);
         Assert.False(task.RecurrenceSpawned);
     }
+
+    [Fact]
+    public void FollowingStarts_lists_the_next_occurrences_in_order()
+    {
+        var starts = Rule(RecurrenceFrequency.Daily).FollowingStarts(At(2026, 11, 16), At(2026, 11, 15), 3);
+
+        Assert.Equal([At(2026, 11, 17), At(2026, 11, 18), At(2026, 11, 19)], starts);
+    }
+
+    [Fact]
+    public void FollowingStarts_skips_occurrences_that_are_already_past()
+    {
+        // Saved on the 20th for a task that started on the 16th: nothing before the 21st is listed.
+        var starts = Rule(RecurrenceFrequency.Daily).FollowingStarts(At(2026, 11, 16), At(2026, 11, 20, 12), 2);
+
+        Assert.Equal([At(2026, 11, 21), At(2026, 11, 22)], starts);
+    }
+
+    [Fact]
+    public void FollowingStarts_stops_at_the_end_day()
+    {
+        var starts = Rule(RecurrenceFrequency.Daily, until: At(2026, 11, 18, 23)).FollowingStarts(At(2026, 11, 16), At(2026, 11, 15), 10);
+
+        Assert.Equal([At(2026, 11, 17), At(2026, 11, 18)], starts);
+    }
+
+    [Fact]
+    public void FollowingStarts_follows_the_chosen_weekdays()
+    {
+        var starts = Rule(RecurrenceFrequency.Weekly, weekdays: Mon | Wed).FollowingStarts(At(2026, 11, 16), At(2026, 11, 15), 3);
+
+        Assert.Equal([At(2026, 11, 18), At(2026, 11, 23), At(2026, 11, 25)], starts);
+    }
+
+    [Fact]
+    public void FollowingStarts_with_a_count_of_zero_is_empty()
+    {
+        Assert.Empty(Rule(RecurrenceFrequency.Daily).FollowingStarts(At(2026, 11, 16), At(2026, 11, 15), 0));
+    }
 }

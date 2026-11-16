@@ -57,6 +57,8 @@ export interface Task {
   recurrence?: Recurrence | null;
   /** Only in the answer to finishing a repeating task: the occurrence that was created. */
   next?: { id: string; startDate: string } | null;
+  /** Saving a repeating task created this many following occurrences right away. */
+  alsoCreated?: number | null;
 }
 
 export interface PagedResult<T> {

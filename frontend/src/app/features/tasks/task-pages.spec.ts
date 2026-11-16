@@ -68,6 +68,18 @@ describe('TaskCreateComponent', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=new-1', { replaceUrl: true });
   });
 
+  it('says how many tasks a repeating one made, counting itself', async () => {
+    const { mount, tasks, notify } = setup(TaskCreateComponent);
+    tasks.create.mockReturnValue(of(aTask({ id: 'new-1', alsoCreated: 11 })));
+    const fixture = mount();
+
+    formOf(fixture)['form'].patchValue({ title: 'Uống thuốc' });
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(notify.success).toHaveBeenCalledWith('Đã tạo 12 việc lặp lại');
+  });
+
   it('after creating from the day planner, returns to the planner pointing at the new task', async () => {
     const { mount, tasks, navigateByUrl } = setup(TaskCreateComponent);
     const router = TestBed.inject(Router);
@@ -241,6 +253,19 @@ describe('TaskEditComponent', () => {
     expect(tasks.update).toHaveBeenCalledWith('t1', expect.objectContaining({ title: 'Mới', status: 'Completed' }));
     expect(notify.success).toHaveBeenCalledWith('Đã lưu thay đổi');
     expect(navigateByUrl).toHaveBeenCalledWith('/tasks?highlight=t1', { replaceUrl: true });
+  });
+
+  it('says so when turning a repeat on while editing created the following tasks', async () => {
+    const { mount, tasks, notify } = setup(TaskEditComponent, 't1');
+    tasks.get.mockReturnValue(of(aTask()));
+    tasks.update.mockReturnValue(of(aTask({ alsoCreated: 11 })));
+    const fixture = mount();
+    await settle(fixture);
+
+    submitForm(fixture.nativeElement);
+    await settle(fixture);
+
+    expect(notify.success).toHaveBeenCalledWith('Đã tạo 12 việc lặp lại');
   });
 
   it('sends a cleared description as null so it is actually removed', async () => {

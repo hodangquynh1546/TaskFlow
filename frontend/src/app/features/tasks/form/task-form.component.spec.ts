@@ -517,6 +517,15 @@ describe('TaskFormComponent', () => {
       expect(el.querySelector('.repeat-every')!.textContent).toContain('tuần');
     });
 
+    it('tells the user that the next repeats are created on save, only once a repeat is chosen', () => {
+      const { el, set } = setup();
+      expect(el.textContent).not.toContain('tạo sẵn');
+
+      set({ repeat: 'Daily' });
+
+      expect(el.textContent).toContain('các lần lặp tiếp theo được tạo sẵn (tối đa 12 việc)');
+    });
+
     it('weekday chips toggle their bit of the mask and say whether they are on', () => {
       const { el, set, form, fixture } = setup();
       set({ repeat: 'Weekly' });

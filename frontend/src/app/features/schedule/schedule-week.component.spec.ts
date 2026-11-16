@@ -4,11 +4,13 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 
 import { ApiError } from '../../core/http/api-error';
+import { NotifyService } from '../../core/notify/notify.service';
+import { ConfirmService } from '../../shared/ui/confirm.service';
 import { PagedResult, Task } from '../../shared/models/task.models';
 import { formatDay } from '../tasks/task-query';
 import { UI_TEST_PROVIDERS, aTask } from '../tasks/test-support';
 import { TaskService } from '../tasks/task.service';
-import { ScheduleComponent } from './schedule.component';
+import { PX_PER_MINUTE, ScheduleComponent } from './schedule.component';
 
 // "Today" is Friday 20 Nov 2026, so the week on screen by default is Monday 16 to Sunday 22.
 // 12 Nov 2026 is a Thursday: its week is Monday 9 to Sunday 15.
@@ -17,8 +19,13 @@ const on = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).toIS
 const task = (id: string, day: number, h: number, m: number, duration: number | null, patch: Partial<Task> = {}) =>
   aTask({ id, title: `Việc ${id}`, startDate: on(day, h, m), durationMinutes: duration, ...patch });
 
+const notify = { success: vi.fn(), error: vi.fn() };
+const confirm = { confirmDelete: vi.fn().mockResolvedValue(true) };
+
 async function setup(url: string, tasks: Task[] = [], configure?: (service: { forDay: ReturnType<typeof vi.fn> }) => void) {
   const service = {
+    changeStatus: vi.fn(),
+    delete: vi.fn(),
     forDay: vi.fn((day: string) => of(paged(tasks.filter((t) => t.startDate !== null && formatDay(new Date(t.startDate)) === day)))),
   };
   configure?.(service);
@@ -27,6 +34,8 @@ async function setup(url: string, tasks: Task[] = [], configure?: (service: { fo
       ...UI_TEST_PROVIDERS,
       provideRouter([{ path: 'schedule', component: ScheduleComponent }, { path: 'tasks/new', component: ScheduleComponent }], withComponentInputBinding()),
       { provide: TaskService, useValue: service },
+      { provide: NotifyService, useValue: notify },
+      { provide: ConfirmService, useValue: confirm },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -45,6 +54,42 @@ async function setup(url: string, tasks: Task[] = [], configure?: (service: { fo
 const columns = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.week__col')];
 const blocksIn = (col: HTMLElement) => [...col.querySelectorAll<HTMLElement>('a.block')];
 const button = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label)!;
+
+describe('ScheduleComponent, week view: buttons on a block', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    confirm.confirmDelete.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('every block in the grid has the three buttons, and yellow and green change its status in place', async () => {
+    const tasks = [task('mon', 9, 9, 0, 60), task('thu', 12, 14, 0, 60)];
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', tasks);
+    expect(el.querySelectorAll('tf-block-actions')).toHaveLength(2);
+    service.changeStatus.mockReturnValue(of({ ...tasks[1], status: 'Completed' }));
+
+    el.querySelectorAll<HTMLButtonElement>('tf-block-actions .act--done')[1].click();
+    await settle();
+
+    expect(service.changeStatus).toHaveBeenCalledWith('thu', 'Completed');
+    expect(blocksIn(columns(el)[3])[0].classList.contains('block--Completed')).toBe(true);
+    expect(service.forDay).toHaveBeenCalledTimes(7); // the week was not reloaded
+  });
+
+  it('red deletes after confirming, and the block leaves its column', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('mon', 9, 9, 0, 60), task('thu', 12, 14, 0, 60)]);
+    service.delete.mockReturnValue(of(undefined));
+
+    el.querySelectorAll<HTMLButtonElement>('tf-block-actions .act--delete')[0].click();
+    await settle();
+
+    expect(confirm.confirmDelete).toHaveBeenCalledWith('Việc mon');
+    expect(service.delete).toHaveBeenCalledWith('mon');
+    expect(columns(el).map((c) => blocksIn(c).length)).toEqual([0, 0, 0, 1, 0, 0, 0]);
+  });
+});
 
 describe('ScheduleComponent, week view', () => {
   beforeEach(() => {
@@ -108,8 +153,8 @@ describe('ScheduleComponent, week view', () => {
       const { el } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 12, 9, 0, 60)]);
       const [a] = blocksIn(columns(el)[3]);
 
-      expect(a.style.top).toBe(`${540 * 1.4}px`);
-      expect(a.style.height).toBe(`${60 * 1.4}px`);
+      expect(a.style.top).toBe(`${540 * PX_PER_MINUTE}px`);
+      expect(a.style.height).toBe(`${60 * PX_PER_MINUTE}px`);
     });
 
     it('overlapping tasks share a column only when they are on the same day', async () => {
