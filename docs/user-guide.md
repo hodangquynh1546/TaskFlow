@@ -19,12 +19,14 @@ Số việc theo trạng thái, số việc quá hạn, việc sắp đến hạ
 - **Chi tiết**: xem, đổi trạng thái, sửa, xóa (có hộp thoại xác nhận).
 - Việc quá hạn là việc có hạn đã qua mà chưa Hoàn thành.
 
-## Lịch ngày
-Chọn **Lịch ngày** để xem các việc của một ngày theo trục giờ.
-- Chuyển ngày bằng nút trước/sau, ô chọn ngày hoặc **Hôm nay**.
+## Lịch (ngày và tuần)
+Chọn **Lịch** để xem các việc theo trục giờ. Nút **Ngày** / **Tuần** ở đầu trang đổi cách xem.
+- Chuyển ngày (hoặc tuần) bằng nút trước/sau, ô chọn ngày hoặc **Hôm nay**.
+- **Tuần** hiện bảy cột từ Thứ Hai đến Chủ Nhật trên cùng một trục giờ; cột hôm nay được tô nổi. Bấm vào ô trống của một cột để tạo việc vào đúng ngày và giờ đó. Trên điện thoại, kéo ngang để xem các cột; trục giờ và tên ngày đứng yên khi cuộn.
+- Ở chế độ Tuần, mỗi ngày hiển thị tối đa 50 việc đầu tiên.
 - Việc trùng giờ hiện cạnh nhau. Việc có giờ bắt đầu nhưng chưa có thời lượng hiện thành khối 30 phút nét đứt (ước lượng).
 - Bấm vào ô trống để tạo việc tại giờ đó; ngày và giờ đã được điền sẵn.
-- Cột bên phải liệt kê việc đến hạn trong ngày nhưng chưa xếp giờ.
+- Mục "Đến hạn trong ngày (hoặc tuần), chưa xếp giờ" liệt kê việc đến hạn nhưng chưa có giờ bắt đầu: cột bên phải ở chế độ Ngày, bên dưới lưới ở chế độ Tuần.
 
 ## Hồ sơ
 Đổi họ tên và email (đổi email cần nhập mật khẩu hiện tại), và đổi mật khẩu (cũng cần mật khẩu hiện tại).

@@ -1,4 +1,8 @@
 import { Task } from '../../shared/models/task.models';
+import { formatDay, parseDay } from '../tasks/task-query';
+
+/** Pixels per minute on the timeline: an hour is 84px tall, so a 15 minute block is still readable. */
+export const PX_PER_MINUTE = 1.4;
 
 /** What a task with a start time but no length is drawn as: the smallest block that is still readable. */
 export const DEFAULT_BLOCK_MINUTES = 30;
@@ -99,4 +103,29 @@ export function layoutDay(tasks: readonly Task[]): DayLayout {
 /** Snaps a minute-of-day to a 15 minute grid, for placing a new task where the user clicked. */
 export function snapToQuarter(minute: number): number {
   return Math.max(0, Math.min(24 * 60 - 15, Math.round(minute / 15) * 15));
+}
+
+/** The Monday on or before a day ("yyyy-MM-dd"): weeks run Monday to Sunday, as in Vietnam, Japan and China. */
+export function startOfWeek(day: string): string {
+  const date = parseDay(day);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return formatDay(date);
+}
+
+/** The seven days, Monday first, of the week that contains `day`. Built by calendar arithmetic so daylight saving never skips or repeats one. */
+export function weekDays(day: string): string[] {
+  const first = parseDay(startOfWeek(day));
+  return Array.from({ length: 7 }, (_, i) => formatDay(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i)));
+}
+
+/** One layout per day, in the order of `days`: each task goes to the day it starts on (the user's local day). */
+export function layoutWeek(days: readonly string[], tasks: readonly Task[]): DayLayout[] {
+  const byDay = new Map<string, Task[]>();
+  for (const task of tasks) {
+    if (task.startDate !== null) {
+      const key = formatDay(new Date(task.startDate));
+      byDay.set(key, [...(byDay.get(key) ?? []), task]);
+    }
+  }
+  return days.map((day) => layoutDay(byDay.get(day) ?? []));
 }

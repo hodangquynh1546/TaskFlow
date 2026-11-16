@@ -1,5 +1,5 @@
 import { Task } from '../../shared/models/task.models';
-import { DEFAULT_BLOCK_MINUTES, layoutDay, snapToQuarter } from './schedule-layout';
+import { DEFAULT_BLOCK_MINUTES, layoutDay, layoutWeek, snapToQuarter, startOfWeek, weekDays } from './schedule-layout';
 
 let seq = 0;
 const task = (h: number, m: number, duration: number | null, patch: Partial<Task> = {}): Task => ({
@@ -144,5 +144,59 @@ describe('layoutDay', () => {
 describe('snapToQuarter', () => {
   it.each([[0, 0], [7, 0], [8, 15], [540, 540], [547, 540], [548, 555], [1439, 1425], [2000, 1425], [-30, 0]])('%i snaps to %i', (minute, expected) => {
     expect(snapToQuarter(minute)).toBe(expected);
+  });
+});
+
+describe('startOfWeek', () => {
+  it.each([
+    ['2026-11-16', '2026-11-16'], // Monday stays
+    ['2026-11-18', '2026-11-16'],
+    ['2026-11-22', '2026-11-16'], // Sunday belongs to the week that began the Monday before
+    ['2026-11-23', '2026-11-23'],
+    ['2026-01-01', '2025-12-29'], // across a year boundary
+    ['2026-03-01', '2026-02-23'], // across a month boundary
+  ])('%s is in the week that starts on %s', (day, monday) => {
+    expect(startOfWeek(day)).toBe(monday);
+  });
+});
+
+describe('weekDays', () => {
+  it('lists Monday to Sunday', () => {
+    expect(weekDays('2026-11-12')).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']);
+  });
+
+  it('crosses a month and a year without skipping or repeating a day', () => {
+    expect(weekDays('2026-12-31')).toEqual(['2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02', '2027-01-03']);
+  });
+
+  it.each(['2026-03-29', '2026-10-25', '2026-11-01'])('has seven distinct days around a daylight-saving change (%s)', (day) => {
+    const days = weekDays(day);
+
+    expect(new Set(days).size).toBe(7);
+    expect(days).toEqual([...days].sort());
+  });
+});
+
+describe('layoutWeek', () => {
+  const days = weekDays('2026-11-12');
+  const onDay = (d: number, h: number, duration: number | null) => task(h, 0, duration, { startDate: new Date(2026, 10, d, h, 0).toISOString() });
+
+  it('gives one layout per day, in the order of the days', () => {
+    const layouts = layoutWeek(days, [onDay(9, 9, 60), onDay(12, 14, 60)]);
+
+    expect(layouts).toHaveLength(7);
+    expect(layouts.map((l) => l.blocks.length)).toEqual([1, 0, 0, 1, 0, 0, 0]);
+  });
+
+  it('tasks at the same hour on different days do not overlap', () => {
+    const layouts = layoutWeek(days, [onDay(9, 9, 60), onDay(10, 9, 60)]);
+
+    expect(layouts.map((l) => l.conflicts)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('ignores tasks without a start time and tasks outside the week', () => {
+    const layouts = layoutWeek(days, [task(9, 0, 60, { startDate: null }), onDay(20, 9, 60)]);
+
+    expect(layouts.every((l) => l.blocks.length === 0)).toBe(true);
   });
 });

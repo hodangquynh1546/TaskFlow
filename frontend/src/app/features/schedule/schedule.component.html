@@ -2,22 +2,26 @@
   <h1>{{ 'nav.schedule' | t }}</h1>
 
   <div class="nav" role="group" [attr.aria-label]="'schedule.pickDay' | t">
-    <button type="button" nz-button class="nav__step" [attr.aria-label]="'schedule.prev' | t" (click)="shift(-1)">
+    <div class="view" role="group" [attr.aria-label]="'schedule.viewLabel' | t">
+      <button type="button" class="view__option" [class.view__option--on]="!isWeek()" [attr.aria-pressed]="!isWeek()" (click)="setView('day')">{{ 'schedule.viewDay' | t }}</button>
+      <button type="button" class="view__option" [class.view__option--on]="isWeek()" [attr.aria-pressed]="isWeek()" (click)="setView('week')">{{ 'schedule.viewWeek' | t }}</button>
+    </div>
+    <button type="button" nz-button class="nav__step" [attr.aria-label]="(isWeek() ? 'schedule.prevWeek' : 'schedule.prev') | t" (click)="shift(-1)">
       <span nz-icon nzType="left" nzTheme="outline" aria-hidden="true"></span>
     </button>
     <nz-date-picker class="nav__picker" [nzFormat]="'schedule.dateFormat' | t" [nzAllowClear]="false" [attr.aria-label]="'schedule.pickDay' | t"
                     [ngModel]="selected()" (ngModelChange)="pick($event)" />
-    <button type="button" nz-button class="nav__step" [attr.aria-label]="'schedule.next' | t" (click)="shift(1)">
+    <button type="button" nz-button class="nav__step" [attr.aria-label]="(isWeek() ? 'schedule.nextWeek' : 'schedule.next') | t" (click)="shift(1)">
       <span nz-icon nzType="right" nzTheme="outline" aria-hidden="true"></span>
     </button>
-    <button type="button" nz-button [disabled]="isToday()" (click)="goToday()">{{ 'schedule.today' | t }}</button>
+    <button type="button" nz-button [disabled]="atToday()" (click)="goToday()">{{ 'schedule.today' | t }}</button>
     <button type="button" nz-button nzType="primary" (click)="createAt(null)">
       <span nz-icon nzType="plus" nzTheme="outline" aria-hidden="true"></span>{{ 'schedule.add' | t }}
     </button>
   </div>
 </header>
 
-<p class="summary" aria-live="polite">{{ summary() }}</p>
+<p class="summary" aria-live="polite">@if (isWeek()) {<strong class="summary__range">{{ weekRange() }}</strong>{{ ' ' }}}{{ summary() }}</p>
 
 @switch (state()) {
   @case ('loading') {
@@ -34,10 +38,14 @@
   @case ('ready') {
     @if (data(); as d) {
       @if (d.truncated) {
-        <p class="note" role="status">{{ 'schedule.truncated' | t }}</p>
+        <p class="note" role="status">{{ (isWeek() ? 'schedule.truncatedWeek' : 'schedule.truncated') | t }}</p>
       }
 
-      <div class="board">
+      <div class="board" [class.board--week]="isWeek()">
+        @if (isWeek()) {
+          <tf-week-grid [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
+                        [highlight]="highlight()" [direction]="direction()" (createAt)="createOn($event)" />
+        } @else {
         <div class="board__panel tf-panel">
           <div class="board__scroll" #scroller>
             <div class="timeline" [style.height.px]="gridHeight()">
@@ -68,9 +76,10 @@
             </div>
           </div>
         </div>
+        }
 
         <aside class="unscheduled tf-panel" aria-labelledby="unscheduled-title">
-          <h2 id="unscheduled-title" class="unscheduled__title">{{ 'schedule.unscheduledTitle' | t }}</h2>
+          <h2 id="unscheduled-title" class="unscheduled__title">{{ (isWeek() ? 'schedule.unscheduledTitleWeek' : 'schedule.unscheduledTitle') | t }}</h2>
           @if (d.unscheduledDue.length === 0) {
             <p class="unscheduled__empty">{{ 'schedule.unscheduledEmpty' | t }}</p>
           } @else {

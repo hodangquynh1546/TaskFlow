@@ -167,14 +167,16 @@ a {
 .ant-select-dropdown:not(:has(.ant-select-item, .ant-empty, .ant-select-item-empty)) { display: none; }
 
 // Rises into place. Used once per screen (the first load), staggered with --i; never on scroll.
+// The stagger stops growing after the first few items: only those are in view at load, and with 50 rows a delay of
+// i * 70ms left everything below the fold invisible for seconds, so scrolling down showed an empty list.
 .tf-rise {
   animation: tf-rise 520ms var(--tf-ease-out) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation-delay: calc(min(var(--i, 0), 8) * 70ms);
 }
 
 .tf-pop {
   animation: tf-pop 480ms var(--tf-ease-pop) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation-delay: calc(min(var(--i, 0), 8) * 70ms);
 }
 
 @keyframes tf-rise {

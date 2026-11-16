@@ -122,7 +122,7 @@ frontend/src/
       auth/         AuthLayoutComponent: khung một cột cho trang đăng nhập/đăng ký
     features/
       auth/         login, register
-      schedule/     Lịch ngày: schedule-layout (thuật toán xếp làn, hàm thuần có test), ScheduleComponent
+      schedule/     Lịch ngày và tuần: schedule-layout (xếp làn, tính tuần Thứ Hai–Chủ Nhật; hàm thuần có test), ScheduleComponent, WeekGridComponent
       dashboard/    DashboardComponent + DashboardService (3 lời gọi song song bằng forkJoin)
       tasks/        list (trạng thái trên URL), form (dùng chung tạo/sửa), create, edit, detail,
                     task.service, task-query (URL <-> truy vấn), task-resource (tải một task theo id)

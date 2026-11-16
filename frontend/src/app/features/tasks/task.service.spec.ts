@@ -207,3 +207,20 @@ describe('TaskService.startingBetween', () => {
     expect(req.request.params.get('pageSize')).toBe('50');
   });
 });
+
+describe('TaskService.dueBetween', () => {
+  it('asks for the deadlines from the start of the first day to the end of the last, soonest first', () => {
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const service = TestBed.inject(TaskService);
+    const http = TestBed.inject(HttpTestingController);
+
+    service.dueBetween('2026-11-16', '2026-11-22').subscribe();
+    const req = http.expectOne((r) => r.url.endsWith('/tasks'));
+    req.flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 1 });
+
+    expect(req.request.params.get('dueFrom')).toBe(new Date(2026, 10, 16, 0, 0, 0, 0).toISOString());
+    expect(req.request.params.get('dueTo')).toBe(new Date(2026, 10, 22, 23, 59, 59, 999).toISOString());
+    expect(req.request.params.get('sortBy')).toBe('dueDate');
+    expect(req.request.params.get('sortDir')).toBe('asc');
+  });
+});

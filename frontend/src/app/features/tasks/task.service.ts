@@ -101,6 +101,18 @@ export class TaskService {
     return this.http.get<PagedResult<Task>>(this.url, { params });
   }
 
+  /** The tasks whose deadline falls from one local day to another, both included (a week of "due" at once). */
+  dueBetween(fromDay: string, toDay: string): Observable<PagedResult<Task>> {
+    const params = new HttpParams()
+      .set('dueFrom', dayBoundary(fromDay, 'start'))
+      .set('dueTo', dayBoundary(toDay, 'end'))
+      .set('sortBy', 'dueDate')
+      .set('sortDir', 'asc')
+      .set('page', 1)
+      .set('pageSize', 50);
+    return this.http.get<PagedResult<Task>>(this.url, { params });
+  }
+
   get(id: string): Observable<Task> {
     return this.http.get<Task>(`${this.url}/${encodeURIComponent(id)}`);
   }

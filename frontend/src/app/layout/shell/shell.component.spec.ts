@@ -55,7 +55,7 @@ describe('ShellComponent', () => {
 
     expect(links).toEqual([
       { text: 'Tổng quan', href: '/dashboard' },
-      { text: 'Lịch ngày', href: '/schedule' },
+      { text: 'Lịch', href: '/schedule' },
       { text: 'Công việc', href: '/tasks' },
       { text: 'Hồ sơ', href: '/profile' },
     ]);

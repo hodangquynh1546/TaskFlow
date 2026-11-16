@@ -6,31 +6,30 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { BehaviorSubject, EMPTY, combineLatest, forkJoin, switchMap, tap } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 
 import { ApiError } from '../../core/http/api-error';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
-import { STATUS_KEYS, Task } from '../../shared/models/task.models';
+import { Task } from '../../shared/models/task.models';
 import { ErrorStateComponent } from '../../shared/ui/error-state.component';
 import { StatusIndicatorComponent } from '../../shared/ui/status-indicator.component';
 import { DueLabelComponent } from '../../shared/ui/due-label.component';
 import { formatDuration } from '../../shared/util/duration';
 import { formatDay, parseDay } from '../tasks/task-query';
 import { TaskService } from '../tasks/task.service';
-import { DayLayout, ScheduledBlock, layoutDay, snapToQuarter } from './schedule-layout';
+import { blockLabel, clock } from './block-label';
+import { DayLayout, PX_PER_MINUTE, ScheduledBlock, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
+import { WeekGridComponent } from './week-grid.component';
 
-/** Pixels per minute on the timeline: an hour is 84px tall, so a 15 minute block is still readable. */
-export const PX_PER_MINUTE = 1.4;
+export { PX_PER_MINUTE };
+
 const MIN_BLOCK_HEIGHT = 26;
 /** How long a just-saved task's block stays lit. */
 const FLASH_MS = 2400;
 /** Matches `.timeline { margin: 16px ... }` and the hour label that sticks out 12px above its line. */
 const TIMELINE_MARGIN_TOP = 16;
 const HOUR_LABEL_ROOM = 14;
-
-const pad = (n: number): string => String(n).padStart(2, '0');
-const clock = (minute: number): string => `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
 
 interface DayData {
   scheduled: Task[];
@@ -41,7 +40,7 @@ interface DayData {
 @Component({
   selector: 'tf-schedule',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, DueLabelComponent, ErrorStateComponent, StatusIndicatorComponent, TranslatePipe],
+  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, DueLabelComponent, ErrorStateComponent, StatusIndicatorComponent, TranslatePipe, WeekGridComponent],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
 })
@@ -55,6 +54,9 @@ export class ScheduleComponent {
   /** The day shown, "yyyy-MM-dd", bound from the query string by the router. Anything unusable means today. */
   readonly date = input<string>();
 
+  /** "week" shows Monday to Sunday around the day; anything else is the single-day planner. */
+  readonly view = input<string>();
+
   /** A task to point at: set after saving one from here, so the planner scrolls to its block. */
   readonly highlight = input<string>();
   protected readonly flashId = signal<string | null>(null);
@@ -67,6 +69,18 @@ export class ScheduleComponent {
   });
   protected readonly isToday = computed(() => this.day() === this.today());
   protected readonly selected = computed(() => parseDay(this.day()));
+  /** True when the screen already shows today: the day itself, or the week that contains it. */
+  protected readonly atToday = computed(() => (this.isWeek() ? this.week().includes(this.today()) : this.isToday()));
+  protected readonly isWeek = computed(() => this.view() === 'week');
+  protected readonly week = computed(() => weekDays(this.day()));
+  protected readonly weekLayouts = computed(() => layoutWeek(this.week(), this.data()?.scheduled ?? []));
+  protected readonly weekRange = computed(() => {
+    const days = this.week();
+    const locale = this.i18n.locale();
+    const from = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric' }).format(parseDay(days[0]));
+    const to = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'numeric', year: 'numeric' }).format(parseDay(days[6]));
+    return this.i18n.t('schedule.weekRange', { from, to });
+  });
 
   protected readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   protected readonly data = signal<DayData | null>(null);
@@ -83,15 +97,17 @@ export class ScheduleComponent {
   });
   protected readonly gridHeight = computed(() => (this.layout().endHour - this.layout().startHour) * 60 * PX_PER_MINUTE);
 
-  /** "Planned 5 h 30 min across 6 tasks." plus a note when blocks overlap. */
+  /** "Planned 5 h 30 min across 6 tasks." plus a note when blocks overlap. In week view, the whole week's totals. */
   protected readonly summary = computed(() => {
     const d = this.data();
     if (!d) {
       return '';
     }
-    const { plannedMinutes, conflicts } = this.layout();
+    const layouts = this.isWeek() ? this.weekLayouts() : [this.layout()];
+    const plannedMinutes = layouts.reduce((sum, l) => sum + l.plannedMinutes, 0);
+    const conflicts = layouts.reduce((sum, l) => sum + l.conflicts, 0);
     if (d.scheduled.length === 0) {
-      return this.i18n.t('schedule.summaryNone');
+      return this.i18n.t(this.isWeek() ? 'schedule.summaryNoneWeek' : 'schedule.summaryNone');
     }
     const count = d.scheduled.length;
     const planned = plannedMinutes > 0
@@ -128,13 +144,26 @@ export class ScheduleComponent {
   });
 
   constructor() {
-    combineLatest([toObservable(this.day), this.reload$])
+    // A week is reloaded only when the week changes, not when the day moves inside it.
+    const anchor = computed(() => (this.isWeek() ? `week:${this.week()[0]}` : `day:${this.day()}`));
+    combineLatest([toObservable(anchor), this.reload$])
       .pipe(
         tap(() => this.state.set('loading')),
-        switchMap(([day]) => {
+        switchMap(([key]) => {
+          const day = key.slice(key.indexOf(':') + 1);
           this.direction.set(this.lastDay && day < this.lastDay ? -1 : 1);
           this.lastDay = day;
-          return forkJoin({ scheduled: this.tasks.forDay(day), due: this.tasks.dueOn(day) }).pipe(
+          const days = untracked(() => this.week());
+          const load = key.startsWith('week:')
+            // The server returns at most 50 tasks per request, so a week is seven days of up to 50 each.
+            ? forkJoin({ days: forkJoin(days.map((d) => this.tasks.forDay(d))), due: this.tasks.dueBetween(days[0], days[6]) }).pipe(
+                map(({ days: results, due }) => ({
+                  scheduled: { items: results.flatMap((r) => r.items), totalCount: results.reduce((sum, r) => sum + r.totalCount, 0) },
+                  due,
+                })),
+              )
+            : forkJoin({ scheduled: this.tasks.forDay(day), due: this.tasks.dueOn(day) });
+          return load.pipe(
             catchError((error: ApiError) => {
               this.error.set(error);
               this.state.set('error');
@@ -163,6 +192,14 @@ export class ScheduleComponent {
       }
       // Everything but the state is read untracked: removing the highlight from the address afterwards must not
       // make this run again and scroll the planner back to its usual place.
+      if (untracked(() => this.isWeek())) {
+        // The week grid scrolls itself; all that is left to do here is to light the block and clear the address.
+        const pointedAt = untracked(() => this.highlight());
+        if (pointedAt) {
+          this.flash(untracked(() => this.weekLayouts().some((l) => l.blocks.some((b) => b.task.id === pointedAt))) ? pointedAt : null);
+        }
+        return;
+      }
       const { pointedAt, target, block } = untracked(() => {
         const pointedAt = this.highlight();
         const found = pointedAt ? this.layout().blocks.find((b) => b.task.id === pointedAt) : undefined;
@@ -204,10 +241,19 @@ export class ScheduleComponent {
     void this.router.navigate([], { queryParams: { highlight: null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
-  protected shift(days: number): void {
+  protected shift(steps: number): void {
     const next = parseDay(this.day());
-    next.setDate(next.getDate() + days);
+    next.setDate(next.getDate() + steps * (this.isWeek() ? 7 : 1));
     this.goTo(formatDay(next));
+  }
+
+  protected setView(view: 'day' | 'week'): void {
+    void this.router.navigate([], { queryParams: { view: view === 'week' ? 'week' : null }, queryParamsHandling: 'merge' });
+  }
+
+  /** A free slot in the week grid: the new-task form opens set to that column's day and hour. */
+  protected createOn(slot: { day: string; minute: number }): void {
+    void this.router.navigate(['/tasks/new'], { queryParams: { date: slot.day, time: clock(snapToQuarter(slot.minute)) } });
   }
 
   protected goToday(): void {
@@ -251,9 +297,7 @@ export class ScheduleComponent {
   }
 
   protected label(block: ScheduledBlock): string {
-    const t = block.task;
-    const length = t.durationMinutes === null ? this.i18n.t('schedule.noLength') : formatDuration(t.durationMinutes, (k, p) => this.i18n.t(k, p));
-    return this.i18n.t('schedule.blockLabel', { title: t.title, from: clock(block.startMinute), to: clock(block.endMinute), length, status: this.i18n.t(STATUS_KEYS[t.status]) });
+    return blockLabel(block, (k, p) => this.i18n.t(k, p));
   }
 
   protected clock = clock;

@@ -1,0 +1,45 @@
+@use './timeline';
+
+:host { display: block; }
+
+.week { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
+.week__scroll { max-height: 70vh; overflow: auto; overscroll-behavior: contain; }
+
+// One grid: a time axis, then seven day columns. Headers stick to the top and the axis to the left, so both stay
+// readable while the week scrolls in either direction on a small screen.
+.week__grid {
+  display: grid;
+  grid-template-columns: 3.5rem repeat(7, minmax(6.75rem, 1fr));
+  grid-template-rows: auto auto;
+  min-width: max-content;
+}
+
+.week__corner,
+.week__head { position: sticky; top: 0; z-index: 6; background: var(--tf-paper); border-bottom: 2px solid var(--tf-edge); }
+.week__corner { left: 0; z-index: 7; }
+
+.week__head { display: flex; align-items: baseline; justify-content: center; gap: var(--tf-space-2); padding: var(--tf-space-3) var(--tf-space-2); border-left: 2px dashed var(--tf-line); color: var(--tf-ink-soft); font-weight: 600; }
+.week__date { font-family: var(--tf-font-display); font-size: var(--tf-text-h3); font-weight: 800; color: var(--tf-ink); }
+// Today is marked by a filled, outlined date as well as colour, so it reads without telling hues apart.
+.week__head--today .week__date { padding: 0 var(--tf-space-3); border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-control); background: var(--tf-tangerine); color: var(--tf-on-color); }
+.week__head--today { color: var(--tf-ink); }
+
+.week__axis { position: sticky; left: 0; z-index: 5; margin: 16px 0; background: var(--tf-paper); }
+.axis__label { position: absolute; right: var(--tf-space-2); transform: translateY(-50%); color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.week__col { position: relative; margin: 16px 0; border-left: 2px dashed var(--tf-line); }
+.week__col--today { background: var(--tf-tangerine-tint); }
+
+.hour { position: absolute; left: 0; right: 0; height: 84px; border-top: 2px dashed var(--tf-line); }
+
+// Narrow columns: smaller type, and the time wraps under the title only when the block is tall enough for it.
+.block { padding: 2px var(--tf-space-2); font-size: var(--tf-text-caption); }
+.block__time { font-size: 0.6875rem; }
+// Columns are narrow, so a title may take up to three lines instead of being cut after a few letters; a block too
+// short for that keeps a single line.
+.block__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; white-space: normal; overflow-wrap: anywhere; }
+.block--short .block__title { display: block; white-space: nowrap; }
+
+@media (max-width: 599.98px) {
+  .week__scroll { max-height: 65vh; }
+}

@@ -81,7 +81,7 @@ describe('ScheduleComponent', () => {
       const { service, el } = await setup('/schedule');
 
       expect(service.forDay).toHaveBeenCalledWith('2026-11-20');
-      expect(el.querySelector<HTMLButtonElement>('.nav button:not(.nav__step):not(.ant-btn-primary)')!.disabled).toBe(true); // "Hôm nay" is already today
+      expect([...el.querySelectorAll<HTMLButtonElement>('.nav button')].find((b) => b.textContent!.trim() === 'Hôm nay')!.disabled).toBe(true); // "Hôm nay" is already today
     });
   });
 
