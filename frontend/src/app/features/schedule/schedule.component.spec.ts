@@ -15,8 +15,8 @@ const paged = (items: Task[], totalCount = items.length): PagedResult<Task> => (
 const block = (id: string, h: number, m: number, duration: number | null, patch: Partial<Task> = {}) =>
   aTask({ id, title: `Việc ${id}`, startDate: at(h, m), durationMinutes: duration, ...patch });
 
-async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(paged([])), due: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled), dueOn: vi.fn().mockReturnValue(due) };
+async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(paged([]))) {
+  const service = { forDay: vi.fn().mockReturnValue(scheduled) };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
@@ -37,8 +37,8 @@ async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(page
   return { harness, service, el, router: TestBed.inject(Router), settle, text: () => el.textContent ?? '' };
 }
 
-async function setupWithComponent(url: string, scheduled: unknown = of(paged([])), due: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled), dueOn: vi.fn().mockReturnValue(due) };
+async function setupWithComponent(url: string, scheduled: unknown = of(paged([]))) {
+  const service = { forDay: vi.fn().mockReturnValue(scheduled) };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
@@ -68,7 +68,6 @@ describe('ScheduleComponent', () => {
       const { service } = await setup('/schedule?date=2026-11-12');
 
       expect(service.forDay).toHaveBeenCalledWith('2026-11-12');
-      expect(service.dueOn).toHaveBeenCalledWith('2026-11-12');
     });
 
     it.each([['abc'], ['2026-02-30'], ['2026-13-01'], ['12/11/2026'], ['']])('falls back to today for the invalid date %j', async (bad) => {
@@ -193,26 +192,6 @@ describe('ScheduleComponent', () => {
 
     it('is announced politely when it changes', async () => {
       expect((await setup()).el.querySelector('.summary')!.getAttribute('aria-live')).toBe('polite');
-    });
-  });
-
-  describe('due today but not yet placed', () => {
-    it('lists open tasks due that day that have no start time', async () => {
-      const { el } = await setup(undefined, of(paged([])), of(paged([
-        aTask({ id: 'u1', title: 'Chưa xếp', dueDate: at(17) }),
-        aTask({ id: 'u2', title: 'Đã xếp rồi', dueDate: at(17), startDate: at(9) }),
-        aTask({ id: 'u3', title: 'Đã xong', dueDate: at(17), status: 'Completed' }),
-      ])));
-
-      const titles = [...el.querySelectorAll('.unscheduled__item a')].map((a) => a.textContent);
-      expect(titles).toEqual(['Chưa xếp']);
-      expect(el.querySelector('.unscheduled__item a')!.getAttribute('href')).toBe('/tasks/u1');
-    });
-
-    it('says so when there are none', async () => {
-      const { el } = await setup();
-
-      expect(el.querySelector('.unscheduled__empty')!.textContent).toBe('Không có việc nào.');
     });
   });
 

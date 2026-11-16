@@ -13,8 +13,6 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { Task } from '../../shared/models/task.models';
 import { ErrorStateComponent } from '../../shared/ui/error-state.component';
-import { StatusIndicatorComponent } from '../../shared/ui/status-indicator.component';
-import { DueLabelComponent } from '../../shared/ui/due-label.component';
 import { formatDuration } from '../../shared/util/duration';
 import { formatDay, parseDay } from '../tasks/task-query';
 import { TaskService } from '../tasks/task.service';
@@ -33,14 +31,13 @@ const HOUR_LABEL_ROOM = 14;
 
 interface DayData {
   scheduled: Task[];
-  unscheduledDue: Task[];
   truncated: boolean;
 }
 
 @Component({
   selector: 'tf-schedule',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, DueLabelComponent, ErrorStateComponent, StatusIndicatorComponent, TranslatePipe, WeekGridComponent],
+  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, ErrorStateComponent, TranslatePipe, WeekGridComponent],
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
 })
@@ -156,13 +153,10 @@ export class ScheduleComponent {
           const days = untracked(() => this.week());
           const load = key.startsWith('week:')
             // The server returns at most 50 tasks per request, so a week is seven days of up to 50 each.
-            ? forkJoin({ days: forkJoin(days.map((d) => this.tasks.forDay(d))), due: this.tasks.dueBetween(days[0], days[6]) }).pipe(
-                map(({ days: results, due }) => ({
-                  scheduled: { items: results.flatMap((r) => r.items), totalCount: results.reduce((sum, r) => sum + r.totalCount, 0) },
-                  due,
-                })),
+            ? forkJoin(days.map((d) => this.tasks.forDay(d))).pipe(
+                map((results) => ({ items: results.flatMap((r) => r.items), totalCount: results.reduce((sum, r) => sum + r.totalCount, 0) })),
               )
-            : forkJoin({ scheduled: this.tasks.forDay(day), due: this.tasks.dueOn(day) });
+            : this.tasks.forDay(day);
           return load.pipe(
             catchError((error: ApiError) => {
               this.error.set(error);
@@ -173,13 +167,8 @@ export class ScheduleComponent {
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe(({ scheduled, due }) => {
-        this.data.set({
-          scheduled: scheduled.items,
-          // Due that day, open, and not on the timeline yet: these still need a time.
-          unscheduledDue: due.items.filter((t) => t.startDate === null && t.status !== 'Completed'),
-          truncated: scheduled.totalCount > scheduled.items.length,
-        });
+      .subscribe((scheduled) => {
+        this.data.set({ scheduled: scheduled.items, truncated: scheduled.totalCount > scheduled.items.length });
         this.error.set(null);
         this.state.set('ready');
       });

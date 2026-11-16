@@ -17,11 +17,9 @@ const on = (day: number, h: number, m = 0) => new Date(2026, 10, day, h, m).toIS
 const task = (id: string, day: number, h: number, m: number, duration: number | null, patch: Partial<Task> = {}) =>
   aTask({ id, title: `Việc ${id}`, startDate: on(day, h, m), durationMinutes: duration, ...patch });
 
-async function setup(url: string, tasks: Task[] = [], due: Task[] = [], configure?: (service: { forDay: ReturnType<typeof vi.fn> }) => void) {
+async function setup(url: string, tasks: Task[] = [], configure?: (service: { forDay: ReturnType<typeof vi.fn> }) => void) {
   const service = {
     forDay: vi.fn((day: string) => of(paged(tasks.filter((t) => t.startDate !== null && formatDay(new Date(t.startDate)) === day)))),
-    dueOn: vi.fn().mockReturnValue(of(paged([]))),
-    dueBetween: vi.fn().mockReturnValue(of(paged(due))),
   };
   configure?.(service);
   TestBed.configureTestingModule({
@@ -56,12 +54,10 @@ describe('ScheduleComponent, week view', () => {
   afterEach(() => vi.useRealTimers());
 
   describe('which week is shown', () => {
-    it('asks for each of the seven days, Monday first, and for what is due that week', async () => {
+    it('asks for each of the seven days, Monday first', async () => {
       const { service } = await setup('/schedule?view=week&date=2026-11-12');
 
       expect(service.forDay.mock.calls.map(([d]) => d)).toEqual(['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']);
-      expect(service.dueBetween).toHaveBeenCalledWith('2026-11-09', '2026-11-15');
-      expect(service.dueOn).not.toHaveBeenCalled();
     });
 
     it('a Sunday belongs to the week that ends on it', async () => {
@@ -81,7 +77,7 @@ describe('ScheduleComponent, week view', () => {
       const { service, el } = await setup('/schedule?view=month&date=2026-11-12');
 
       expect(el.querySelector('tf-week-grid')).toBeNull();
-      expect(service.dueBetween).not.toHaveBeenCalled();
+      expect(el.querySelector('.timeline')).not.toBeNull();
     });
 
     it('names the week in the summary line', async () => {
@@ -172,22 +168,14 @@ describe('ScheduleComponent, week view', () => {
     });
 
     it('says when a day has more than 50 tasks and only the first are shown', async () => {
-      const { el } = await setup('/schedule?view=week&date=2026-11-12', [], [], (service) =>
+      const { el } = await setup('/schedule?view=week&date=2026-11-12', [], (service) =>
         service.forDay.mockImplementation((day: string) => of(paged(day === '2026-11-12' ? [task('a', 12, 9, 0, 60)] : [], day === '2026-11-12' ? 80 : 0))));
 
       expect(el.querySelector('.note')!.textContent).toContain('hơn 50 việc');
     });
 
-    it('lists open tasks due that week that have no start time', async () => {
-      const due = [aTask({ id: 'd1', title: 'Nộp hồ sơ', startDate: null, dueDate: on(13, 17), status: 'Todo' }), aTask({ id: 'd2', title: 'Đã xong', startDate: null, dueDate: on(13, 17), status: 'Completed' }), aTask({ id: 'd3', title: 'Có giờ rồi', startDate: on(13, 9), dueDate: on(13, 17) })];
-      const { el } = await setup('/schedule?view=week&date=2026-11-12', [], due);
-
-      expect(el.querySelector('.unscheduled__title')!.textContent).toContain('trong tuần');
-      expect([...el.querySelectorAll('.unscheduled__item a')].map((a) => a.textContent)).toEqual(['Nộp hồ sơ']);
-    });
-
     it('shows a failure with a retry when any day cannot be loaded', async () => {
-      const { el } = await setup('/schedule?view=week&date=2026-11-12', [], [], (service) =>
+      const { el } = await setup('/schedule?view=week&date=2026-11-12', [], (service) =>
         service.forDay.mockImplementation((day: string) => (day === '2026-11-14' ? throwError(() => new ApiError(500, 'Máy chủ lỗi.')) : of(paged([])))));
 
       expect(el.querySelector('tf-error-state')).not.toBeNull();

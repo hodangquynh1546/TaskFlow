@@ -16,8 +16,7 @@
 .view__option--on, .view__option--on:hover { background: var(--tf-tangerine); color: var(--tf-on-color); font-weight: 700; }
 .note { margin-bottom: var(--tf-space-3); font-size: var(--tf-text-small); font-weight: 600; }
 
-.board { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: var(--tf-space-8); align-items: start; }
-.board--week { grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-6); } // the grid needs the full width
+.board__panel { max-width: 52rem; } // one day is a narrow column of blocks; stretched across the whole page it reads poorly
 .board__panel { overflow: hidden; box-shadow: var(--tf-shadow-panel); }
 .board__scroll { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
 
@@ -25,19 +24,11 @@
 
 .hour { position: absolute; left: 0; right: 0; height: 84px; border-top: 2px dashed var(--tf-line); }
 .hour__label { position: absolute; left: -3.75rem; top: -0.75rem; width: 3.2rem; text-align: right; color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-weight: 600; font-variant-numeric: tabular-nums; background: var(--tf-paper); }
-.unscheduled { padding: var(--tf-space-4) var(--tf-space-4) var(--tf-space-2); background: var(--tf-lemon-tint); }
-.unscheduled__title { font-size: var(--tf-text-h3); padding-bottom: var(--tf-space-2); }
-.unscheduled__empty { padding: var(--tf-space-2) 0 var(--tf-space-3); color: var(--tf-ink-soft); }
-.unscheduled__list { list-style: none; margin: 0; padding: 0; }
-.unscheduled__item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--tf-space-1) var(--tf-space-3); align-items: center; padding: var(--tf-space-3) 0; border-top: 2px dashed var(--tf-line); }
-.unscheduled__item a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--tf-ink); }
-.unscheduled__item tf-due { grid-column: 2; }
 
 .skeleton { display: flex; flex-direction: column; gap: var(--tf-space-3); }
 .sk { height: 64px; border-radius: var(--tf-radius-sticker); }
 
 @media (max-width: 1023.98px) {
-  .board { grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-6); }
   .board__scroll { max-height: 60vh; }
 }
 

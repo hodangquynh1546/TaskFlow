@@ -26,7 +26,6 @@ Chọn **Lịch** để xem các việc theo trục giờ. Nút **Ngày** / **Tu
 - Ở chế độ Tuần, mỗi ngày hiển thị tối đa 50 việc đầu tiên.
 - Việc trùng giờ hiện cạnh nhau. Việc có giờ bắt đầu nhưng chưa có thời lượng hiện thành khối 30 phút nét đứt (ước lượng).
 - Bấm vào ô trống để tạo việc tại giờ đó; ngày và giờ đã được điền sẵn.
-- Mục "Đến hạn trong ngày (hoặc tuần), chưa xếp giờ" liệt kê việc đến hạn nhưng chưa có giờ bắt đầu: cột bên phải ở chế độ Ngày, bên dưới lưới ở chế độ Tuần.
 
 ## Hồ sơ
 Đổi họ tên và email (đổi email cần nhập mật khẩu hiện tại), và đổi mật khẩu (cũng cần mật khẩu hiện tại).

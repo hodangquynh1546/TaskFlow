@@ -95,17 +95,6 @@ describe('TaskService', () => {
       expect(new Date(params.get('startTo')!)).toEqual(new Date(2026, 10, 12, 23, 59, 59, 999));
       expect([params.get('sortBy'), params.get('sortDir'), params.get('page'), params.get('pageSize')]).toEqual(['startDate', 'asc', '1', '50']);
     });
-
-    it('dueOn asks for tasks whose deadline falls on that local day', () => {
-      const { service, http } = setup();
-
-      service.dueOn('2026-11-12').subscribe();
-      const params = http.expectOne((r) => r.url === '/api/tasks').request.params;
-
-      expect(new Date(params.get('dueFrom')!)).toEqual(new Date(2026, 10, 12, 0, 0, 0, 0));
-      expect(new Date(params.get('dueTo')!)).toEqual(new Date(2026, 10, 12, 23, 59, 59, 999));
-      expect(params.get('sortBy')).toBe('dueDate');
-    });
   });
 
   it('get, create, update, status change and delete use the documented endpoints', () => {
@@ -205,22 +194,5 @@ describe('TaskService.startingBetween', () => {
     expect(req.request.params.get('sortBy')).toBe('startDate');
     expect(req.request.params.get('sortDir')).toBe('asc');
     expect(req.request.params.get('pageSize')).toBe('50');
-  });
-});
-
-describe('TaskService.dueBetween', () => {
-  it('asks for the deadlines from the start of the first day to the end of the last, soonest first', () => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
-    const service = TestBed.inject(TaskService);
-    const http = TestBed.inject(HttpTestingController);
-
-    service.dueBetween('2026-11-16', '2026-11-22').subscribe();
-    const req = http.expectOne((r) => r.url.endsWith('/tasks'));
-    req.flush({ items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 1 });
-
-    expect(req.request.params.get('dueFrom')).toBe(new Date(2026, 10, 16, 0, 0, 0, 0).toISOString());
-    expect(req.request.params.get('dueTo')).toBe(new Date(2026, 10, 22, 23, 59, 59, 999).toISOString());
-    expect(req.request.params.get('sortBy')).toBe('dueDate');
-    expect(req.request.params.get('sortDir')).toBe('asc');
   });
 });

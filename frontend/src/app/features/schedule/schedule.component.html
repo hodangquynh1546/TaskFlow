@@ -41,7 +41,7 @@
         <p class="note" role="status">{{ (isWeek() ? 'schedule.truncatedWeek' : 'schedule.truncated') | t }}</p>
       }
 
-      <div class="board" [class.board--week]="isWeek()">
+      <div class="board">
         @if (isWeek()) {
           <tf-week-grid [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
                         [highlight]="highlight()" [direction]="direction()" (createAt)="createOn($event)" />
@@ -77,23 +77,6 @@
           </div>
         </div>
         }
-
-        <aside class="unscheduled tf-panel" aria-labelledby="unscheduled-title">
-          <h2 id="unscheduled-title" class="unscheduled__title">{{ (isWeek() ? 'schedule.unscheduledTitleWeek' : 'schedule.unscheduledTitle') | t }}</h2>
-          @if (d.unscheduledDue.length === 0) {
-            <p class="unscheduled__empty">{{ 'schedule.unscheduledEmpty' | t }}</p>
-          } @else {
-            <ul class="unscheduled__list">
-              @for (task of d.unscheduledDue; track task.id) {
-                <li class="unscheduled__item">
-                  <tf-status [status]="task.status" [compact]="true" />
-                  <a [routerLink]="['/tasks', task.id]">{{ task.title }}</a>
-                  <tf-due [dueDate]="task.dueDate" [status]="task.status" />
-                </li>
-              }
-            </ul>
-          }
-        </aside>
       </div>
     }
   }

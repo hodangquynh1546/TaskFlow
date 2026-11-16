@@ -235,6 +235,6 @@ Rủi ro còn lại cần nhìn bằng mắt ở Phase 4 và 5 (chụp màn hìn
 - Trang `/schedule?date=YYYY-MM-DD`, mục "Lịch ngày" trong menu. Điều hướng ngày: nút trước/sau, ô chọn ngày, "Hôm nay".
 - Trục giờ dọc, cả ngày 00:00–24:00 (hôm nay mở với giờ hiện tại ở dòng đầu); 1 giờ = 84px. Khối dùng màu theo trạng thái (Hoàn thành: gạch ngang tiêu đề), thanh trái theo ưu tiên; việc chồng giờ chia làn.
 - Khối dưới 36px chuyển bố cục một dòng để tiêu đề không bị cắt; việc chưa có thời lượng vẽ 30 phút nét đứt.
-- Cột phải: "Đến hạn trong ngày, chưa xếp giờ" và tổng thời gian đã xếp ("Đã xếp 2 giờ cho 1 việc"). Số liệu chỉ lấy từ dữ liệu thật.
+- Dòng tóm tắt phía trên: tổng thời gian đã xếp ("Đã xếp 2 giờ cho 1 việc"). Số liệu chỉ lấy từ dữ liệu thật. (Cột phải "Đến hạn trong ngày, chưa xếp giờ" đã được gỡ theo yêu cầu.)
 - Form: giờ bắt đầu + nhóm nút thời lượng (Không đặt, 15 phút, 30 phút, 1/2/3/4 giờ, Khác) kèm gợi ý "Kết thúc lúc HH:mm"; lỗi vượt nửa đêm nêu cách sửa.
 - Đã kiểm tra trình duyệt thật (tạo từ ô trống 09:00, lưu, khối 09:00–11:00 hiện đúng).
