@@ -20,7 +20,7 @@ const task = (id: string, day: number, h: number, m: number, duration: number | 
   aTask({ id, title: `Việc ${id}`, startDate: on(day, h, m), durationMinutes: duration, ...patch });
 
 const notify = { success: vi.fn(), error: vi.fn() };
-const confirm = { confirmDelete: vi.fn().mockResolvedValue(true) };
+const confirm = { confirmDelete: vi.fn().mockResolvedValue(true), confirmDeleteMany: vi.fn().mockResolvedValue(true) };
 
 async function setup(url: string, tasks: Task[] = [], configure?: (service: { forDay: ReturnType<typeof vi.fn> }) => void) {
   const service = {
@@ -54,6 +54,54 @@ async function setup(url: string, tasks: Task[] = [], configure?: (service: { fo
 const columns = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.week__col')];
 const blocksIn = (col: HTMLElement) => [...col.querySelectorAll<HTMLElement>('a.block')];
 const button = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label)!;
+
+describe('ScheduleComponent, week view: selecting several tasks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    confirm.confirmDeleteMany.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const tap = (el: Element) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  it('picks blocks across different days and deletes them all after one confirmation', async () => {
+    const tasks = [task('mon', 9, 9, 0, 60), task('wed', 11, 9, 0, 60), task('thu', 12, 14, 0, 60)];
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', tasks);
+    service.delete.mockReturnValue(of(undefined));
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Chọn nhiều')!.click();
+    await settle();
+
+    tap(blocksIn(columns(el)[0])[0]);
+    tap(blocksIn(columns(el)[3])[0]);
+    await settle();
+    expect(el.querySelectorAll('a.block--picked')).toHaveLength(2);
+    expect(el.querySelectorAll('tf-block-actions')).toHaveLength(0);
+    expect(blocksIn(columns(el)[0])[0].getAttribute('href')).toBeNull();
+
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Xóa đã chọn')!.click();
+    await vi.waitFor(() => expect(notify.success).toHaveBeenCalled());
+    await settle();
+
+    expect(confirm.confirmDeleteMany).toHaveBeenCalledWith(2);
+    expect(service.delete.mock.calls.map(([id]) => id).sort()).toEqual(['mon', 'thu']);
+    expect(columns(el).map((c) => blocksIn(c).length)).toEqual([0, 0, 1, 0, 0, 0, 0]);
+    expect(service.forDay).toHaveBeenCalledTimes(7); // no reload
+  });
+
+  it('"Chọn tất cả" picks every block of the week', async () => {
+    const { el, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('mon', 9, 9, 0, 60), task('thu', 12, 14, 0, 60)]);
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Chọn nhiều')!.click();
+    await settle();
+
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Chọn tất cả')!.click();
+    await settle();
+
+    expect(el.querySelectorAll('a.block--picked')).toHaveLength(2);
+    expect(el.querySelector('.bulk__count')!.textContent).toBe('Đã chọn 2 việc');
+  });
+});
 
 describe('ScheduleComponent, week view: buttons on a block', () => {
   beforeEach(() => {

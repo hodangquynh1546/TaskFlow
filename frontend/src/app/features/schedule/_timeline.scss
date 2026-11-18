@@ -59,3 +59,7 @@
 .block:focus-visible + tf-block-actions,
 .block--selected + tf-block-actions,
 tf-block-actions:focus-within { @include shown; }
+
+// A block picked for deletion with several at once: a thick outline and a tick before the title, so it is not colour alone.
+.block--picked { outline: 4px solid var(--tf-tangerine); outline-offset: 2px; z-index: 6; }
+.block--picked .block__title::before { content: '\2713\00a0'; font-weight: 800; }

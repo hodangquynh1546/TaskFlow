@@ -60,7 +60,7 @@ async function setupWithComponent(url: string, scheduled: unknown = of(paged([])
 }
 
 const notify = { success: vi.fn(), error: vi.fn() };
-const confirm = { confirmDelete: vi.fn().mockResolvedValue(true) };
+const confirm = { confirmDelete: vi.fn().mockResolvedValue(true), confirmDeleteMany: vi.fn().mockResolvedValue(true) };
 
 const blocks = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('a.block')];
 
@@ -147,7 +147,7 @@ describe('ScheduleComponent, buttons on a block', () => {
     expect(el.querySelector('a.block + tf-block-actions')).not.toBeNull();
     expect(el.querySelector('a.block tf-block-actions')).toBeNull(); // a link may not contain buttons
     const { doing, done, del } = acts(el);
-    expect([doing, done, del].map((b) => b.getAttribute('aria-label'))).toEqual(['Chuyển sang Đang làm', 'Đánh dấu hoàn thành', 'Xóa công việc']);
+    expect([doing, done, del].map((b) => b.getAttribute('aria-label'))).toEqual(['Chuyển sang Đang làm: Việc a', 'Đánh dấu hoàn thành: Việc a', 'Xóa công việc: Việc a']);
   });
 
   it('is laid over its own block: same place and size', async () => {
@@ -194,8 +194,9 @@ describe('ScheduleComponent, buttons on a block', () => {
     expect(notify.success.mock.calls[0][0]).toMatch(/^Đã hoàn thành\. Việc kế tiếp:/);
   });
 
-  it('the button of the status the task already has is shown pressed and does nothing', async () => {
+  it('the button of the status the task already has is shown pressed, and pressing it puts the task back to "to do"', async () => {
     const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60, { status: 'InProgress' })])));
+    service.changeStatus.mockReturnValue(of(aTask({ id: 'a', title: 'Việc a', startDate: at(9), durationMinutes: 60, status: 'Todo' })));
     const { doing, done } = acts(el);
 
     expect(doing.getAttribute('aria-pressed')).toBe('true');
@@ -203,7 +204,9 @@ describe('ScheduleComponent, buttons on a block', () => {
     doing.click();
     await settle();
 
-    expect(service.changeStatus).not.toHaveBeenCalled();
+    expect(service.changeStatus).toHaveBeenCalledWith('a', 'Todo');
+    expect(notify.success).toHaveBeenCalledWith('Đã chuyển sang Chưa làm');
+    expect(blocks(el)[0].classList.contains('block--InProgress')).toBe(false);
   });
 
   it('shows the server message and leaves the block alone when the change fails', async () => {
@@ -267,6 +270,155 @@ describe('ScheduleComponent, buttons on a block', () => {
     slow.next(aTask({ id: 'a', startDate: at(9), status: 'Completed' }));
     await settle();
     expect(acts(el).done.disabled).toBe(false);
+  });
+});
+
+describe('ScheduleComponent, selecting several tasks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    notify.error.mockClear();
+    confirm.confirmDeleteMany.mockReset().mockResolvedValue(true);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const three = () => of(paged([block('a', 9, 0, 60), block('b', 11, 0, 60), block('c', 13, 0, 60)]));
+  const button = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === label)!;
+  const pickedTitles = (el: HTMLElement) => blocks(el).filter((b) => b.classList.contains('block--picked')).map((b) => b.querySelector('.block__title')!.textContent);
+  const tap = (el: Element) => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+  it('"Chọn nhiều" turns the mode on: a hint replaces the summary and the blocks stop being links', async () => {
+    const { el, settle } = await setup(undefined, three());
+    expect(el.querySelector('.bulk')).toBeNull();
+
+    button(el, 'Chọn nhiều').click();
+    await settle();
+
+    expect(el.querySelector('.bulk')!.textContent).toContain('Bấm vào các việc trên lịch để chọn.');
+    expect(el.querySelector('.summary')).toBeNull();
+    expect(blocks(el).every((b) => b.getAttribute('href') === null && b.getAttribute('role') === 'button')).toBe(true);
+    expect(el.querySelectorAll('tf-block-actions')).toHaveLength(0); // the per-block buttons are put away
+    expect(button(el, 'Xong').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('a tap on a block picks it, a second tap lets go, and the count says how many', async () => {
+    const { el, router, settle } = await setup(undefined, three());
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    button(el, 'Chọn nhiều').click();
+    await settle();
+
+    tap(blocks(el)[0]);
+    tap(blocks(el)[2]);
+    await settle();
+    expect(pickedTitles(el)).toEqual(['Việc a', 'Việc c']);
+    expect(blocks(el)[0].getAttribute('aria-pressed')).toBe('true');
+    expect(blocks(el)[1].getAttribute('aria-pressed')).toBe('false');
+    expect(el.querySelector('.bulk__count')!.textContent).toBe('Đã chọn 2 việc');
+
+    tap(blocks(el)[0]);
+    await settle();
+    expect(pickedTitles(el)).toEqual(['Việc c']);
+    expect(navigate).not.toHaveBeenCalled(); // picking never opens the task
+  });
+
+  it('"Chọn tất cả" picks every task on screen and "Bỏ chọn" clears them', async () => {
+    const { el, settle } = await setup(undefined, three());
+    button(el, 'Chọn nhiều').click();
+    await settle();
+
+    button(el, 'Chọn tất cả').click();
+    await settle();
+    expect(pickedTitles(el)).toEqual(['Việc a', 'Việc b', 'Việc c']);
+
+    button(el, 'Bỏ chọn').click();
+    await settle();
+    expect(pickedTitles(el)).toEqual([]);
+    expect(button(el, 'Xóa đã chọn').disabled).toBe(true);
+  });
+
+  it('deleting asks once for all of them, deletes each, and takes them off the planner', async () => {
+    const { el, service, settle } = await setup(undefined, three());
+    service.delete.mockReturnValue(of(undefined));
+    button(el, 'Chọn nhiều').click();
+    await settle();
+    tap(blocks(el)[0]);
+    tap(blocks(el)[1]);
+    await settle();
+
+    button(el, 'Xóa đã chọn').click();
+    await vi.waitFor(() => expect(notify.success).toHaveBeenCalled());
+    await settle();
+
+    expect(confirm.confirmDeleteMany).toHaveBeenCalledTimes(1);
+    expect(confirm.confirmDeleteMany).toHaveBeenCalledWith(2);
+    expect(service.delete.mock.calls.map(([id]) => id).sort()).toEqual(['a', 'b']);
+    expect(blocks(el).map((b) => b.querySelector('.block__title')!.textContent)).toEqual(['Việc c']);
+    expect(notify.success).toHaveBeenCalledWith('Đã xóa 2 công việc');
+    expect(el.querySelector('.bulk__count')!.textContent).toBe('Bấm vào các việc trên lịch để chọn.');
+  });
+
+  it('nothing is deleted when the confirmation is declined, and the picks stay', async () => {
+    const { el, service, settle } = await setup(undefined, three());
+    confirm.confirmDeleteMany.mockResolvedValue(false);
+    button(el, 'Chọn nhiều').click();
+    await settle();
+    tap(blocks(el)[0]);
+    await settle();
+
+    button(el, 'Xóa đã chọn').click();
+    await settle();
+
+    expect(service.delete).not.toHaveBeenCalled();
+    expect(pickedTitles(el)).toEqual(['Việc a']);
+  });
+
+  it('when some deletions fail, the others still go, and the failed ones stay picked with a message', async () => {
+    const { el, service, settle } = await setup(undefined, three());
+    service.delete.mockImplementation((id: string) => (id === 'b' ? throwError(() => new ApiError(500, 'Lỗi.')) : of(undefined)));
+    button(el, 'Chọn nhiều').click();
+    await settle();
+    button(el, 'Chọn tất cả').click();
+    await settle();
+
+    button(el, 'Xóa đã chọn').click();
+    await vi.waitFor(() => expect(notify.error).toHaveBeenCalled());
+    await settle();
+
+    expect(blocks(el).map((b) => b.querySelector('.block__title')!.textContent)).toEqual(['Việc b']);
+    expect(pickedTitles(el)).toEqual(['Việc b']);
+    expect(notify.success).toHaveBeenCalledWith('Đã xóa 2 công việc');
+    expect(notify.error).toHaveBeenCalledWith('Không xóa được 1 công việc. Chúng vẫn được chọn, thử lại sau.');
+  });
+
+  it('"Xong" and the Esc key leave the mode and drop the picks; the blocks are links again', async () => {
+    const { el, settle } = await setup(undefined, three());
+    button(el, 'Chọn nhiều').click();
+    await settle();
+    tap(blocks(el)[0]);
+    await settle();
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await settle();
+
+    expect(el.querySelector('.bulk')).toBeNull();
+    expect(pickedTitles(el)).toEqual([]);
+    expect(blocks(el)[0].getAttribute('href')).toBe('/tasks/a');
+    expect(el.querySelectorAll('tf-block-actions')).toHaveLength(3);
+  });
+
+  it('going to another day drops the picks but stays in the mode', async () => {
+    const { el, settle } = await setup(undefined, three());
+    button(el, 'Chọn nhiều').click();
+    await settle();
+    tap(blocks(el)[0]);
+    await settle();
+
+    el.querySelector<HTMLButtonElement>('button[aria-label="Ngày sau"]')!.click();
+    await settle();
+
+    expect(el.querySelector('.bulk')).not.toBeNull();
+    expect(pickedTitles(el)).toEqual([]);
   });
 });
 

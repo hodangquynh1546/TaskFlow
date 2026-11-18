@@ -76,6 +76,14 @@ describe('ReportComponent', () => {
     expect(charts[0].querySelector<HTMLElement>('.bar')!.style.height).toBe('62.5%'); // 2.5 h on a 4 h axis
   });
 
+  it('hides the table through a wrapper, so it cannot lengthen the page and leave blank space under the report', () => {
+    const { el } = setup();
+    const table = el.querySelector('table')!;
+
+    expect(table.classList.contains('tf-visually-hidden')).toBe(false);
+    expect(table.parentElement!.classList.contains('tf-visually-hidden')).toBe(true);
+  });
+
   it('gives assistive technology the same numbers as a table, and hides the picture from it', () => {
     const { el } = setup();
 

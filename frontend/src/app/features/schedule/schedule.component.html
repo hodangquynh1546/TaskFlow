@@ -15,13 +15,27 @@
       <span nz-icon nzType="right" nzTheme="outline" aria-hidden="true"></span>
     </button>
     <button type="button" nz-button [disabled]="atToday()" (click)="goToday()">{{ 'schedule.today' | t }}</button>
+    <button type="button" nz-button class="nav__select" [class.nav__select--on]="selecting()" [attr.aria-pressed]="selecting()" (click)="toggleSelecting()">
+      {{ (selecting() ? 'schedule.selectDone' : 'schedule.select') | t }}
+    </button>
     <button type="button" nz-button nzType="primary" (click)="createAt(null)">
       <span nz-icon nzType="plus" nzTheme="outline" aria-hidden="true"></span>{{ 'schedule.add' | t }}
     </button>
   </div>
 </header>
 
-<p class="summary" aria-live="polite" #summaryLine>@if (isWeek()) {<strong class="summary__range">{{ weekRange() }}</strong>{{ ' ' }}}{{ summary() }}</p>
+<div class="summary-row" #summaryLine>
+  @if (selecting()) {
+    <div class="bulk" role="region" [attr.aria-label]="'schedule.bulkLabel' | t">
+      <p class="bulk__count" aria-live="polite">{{ picked().size ? ('schedule.pickedCount' | t: { count: picked().size }) : ('schedule.pickHint' | t) }}</p>
+      <button type="button" nz-button [disabled]="bulkBusy() || !hasTasks()" (click)="pickAll()">{{ 'schedule.pickAll' | t }}</button>
+      <button type="button" nz-button [disabled]="bulkBusy() || picked().size === 0" (click)="clearPicks()">{{ 'schedule.pickNone' | t }}</button>
+      <button type="button" nz-button nzType="primary" nzDanger [disabled]="bulkBusy() || picked().size === 0" (click)="deletePicked()">{{ 'schedule.deletePicked' | t }}</button>
+    </div>
+  } @else {
+    <p class="summary" aria-live="polite">@if (isWeek()) {<strong class="summary__range">{{ weekRange() }}</strong>{{ ' ' }}}{{ summary() }}</p>
+  }
+</div>
 
 @switch (state()) {
   @case ('loading') {
@@ -43,7 +57,7 @@
 
       <div class="board" [style.--hour-h.px]="hourHeight()">
         @if (isWeek()) {
-          <tf-week-grid [hourHeight]="hourHeight()" [busyIds]="busy()" [selectedId]="selectedId()" [tapToSelect]="touch()" (blockTap)="tapBlock($event)" (statusChosen)="chooseStatus($event.task, $event.status, $event.event)" (removeRequested)="remove($event)" [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
+          <tf-week-grid [hourHeight]="hourHeight()" [selecting]="selecting()" [pickedIds]="picked()" [busyIds]="busy()" [selectedId]="selectedId()" [tapToSelect]="touch()" (blockTap)="tapBlock($event)" (statusChosen)="chooseStatus($event.task, $event.status, $event.event)" (removeRequested)="remove($event)" [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
                         [highlight]="highlight()" [direction]="direction()" (createAt)="createOn($event)" />
         } @else {
         <div class="board__panel tf-panel">
@@ -59,7 +73,7 @@
               }
 
               @for (block of layout().blocks; track block.task.id; let i = $index) {
-                <a class="block" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" (click)="tapBlock(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
+                <a class="block" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" [class.block--picked]="picked().has(block.task.id)" [attr.aria-pressed]="selecting() ? picked().has(block.task.id) : null" (click)="tapBlock(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
                    [class.block--estimated]="block.estimated" [class.block--flash]="block.task.id === flashId()" [class.block--short]="isShort(block)"
                    [routerLink]="link(block.task.id)" [attr.aria-label]="label(block)" [attr.title]="label(block)"
                    [style.top.px]="top(block)" [style.height.px]="height(block)"
@@ -67,10 +81,12 @@
                    [style.--i]="i" [style.--dir]="direction()">
                   <span class="block__text"><span class="block__title">{{ block.task.title }}</span><span class="block__time">{{ clock(block.startMinute) }}–{{ clock(block.endMinute) }}</span></span>
                 </a>
-                <tf-block-actions [status]="block.task.status" [busy]="isBusy(block.task.id)"
+                @if (!selecting()) {
+                <tf-block-actions [taskTitle]="block.task.title" [status]="block.task.status" [busy]="isBusy(block.task.id)"
                                   [style.top.px]="top(block)" [style.height.px]="height(block)"
                                   [style.left.%]="(block.lane / block.lanes) * 100" [style.width.%]="100 / block.lanes"
                                   (choose)="chooseStatus(block.task, $event.status, $event.event)" (remove)="remove(block.task)" />
+                }
               }
 
               @if (nowTop(); as top) {

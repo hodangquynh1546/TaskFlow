@@ -523,6 +523,16 @@ describe('TaskDetailComponent', () => {
       expect(navigateByUrl).toHaveBeenCalledWith('/schedule?view=week&date=2026-11-18');
     });
 
+    it('deleting a task of another day returns to the week or day it was on, in the same view', async () => {
+      const { fixture, tasks, navigateByUrl } = await loadFrom('/schedule?view=week&date=2026-11-18');
+      fixture.componentInstance['resource'].set(aTask({ id: 't1', startDate: new Date(2026, 10, 24, 9, 0).toISOString() }));
+      tasks.delete.mockReturnValue(of(undefined));
+
+      await fixture.componentInstance['remove']();
+
+      expect(navigateByUrl).toHaveBeenCalledWith('/schedule?view=week&date=2026-11-24');
+    });
+
     it('the memory survives the trip: from the overview, to the task, and the link still says the overview', async () => {
       const { el } = await loadFrom('/dashboard');
 

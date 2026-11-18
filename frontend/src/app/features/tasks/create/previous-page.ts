@@ -1,5 +1,5 @@
 import { sanitizeReturnUrl } from '../../../core/auth/return-url';
-import { Browse, classifyBrowse } from '../../../core/navigation/browse-memory';
+import { Browse, backTarget, classifyBrowse } from '../../../core/navigation/browse-memory';
 import { formatDay } from '../task-query';
 
 /** Where the task list lives: the destination when there is no sensible earlier page to return to. */
@@ -36,18 +36,41 @@ export function whereAfterSave(previousUrl: string | null | undefined, memory: B
   }
 
   if (origin.kind === 'schedule') {
-    const params = new URLSearchParams(origin.url.split('?')[1] ?? '');
-    const day = task.startDate ? formatDay(new Date(task.startDate)) : params.get('date');
-    const next = new URLSearchParams();
-    if (day) {
-      next.set('date', day);
-    }
-    next.set('highlight', task.id);
-    return `/schedule?${next.toString()}`;
+    return plannerUrl(origin.url, task, task.id);
   }
 
   const params = new URLSearchParams(origin.kind === 'list' ? (origin.url.split('?')[1] ?? '') : '');
   params.delete('page');
   params.set('highlight', task.id);
   return `${TASK_LIST_URL}?${params.toString()}`;
+}
+
+/**
+ * The planner address for a task: the same view (day or week) the user was in, on the day the task starts (or on the day
+ * they were looking at when it has no start time). `highlight` asks the planner to scroll to the task's block.
+ */
+function plannerUrl(plannerUrlBefore: string, task: { startDate: string | null }, highlight?: string): string {
+  const params = new URLSearchParams(plannerUrlBefore.split('?')[1] ?? '');
+  const day = task.startDate ? formatDay(new Date(task.startDate)) : params.get('date');
+  const next = new URLSearchParams();
+  // The week view must survive: the task lands in its own place in the week, not on a single day.
+  if (params.get('view') === 'week') {
+    next.set('view', 'week');
+  }
+  if (day) {
+    next.set('date', day);
+  }
+  if (highlight) {
+    next.set('highlight', highlight);
+  }
+  const query = next.toString();
+  return query ? `/schedule?${query}` : '/schedule';
+}
+
+/**
+ * Where to go after deleting a task opened from the planner: the planner in the same view, on the day the task was on,
+ * which is where its block used to be. From anywhere else, the page it was opened from.
+ */
+export function whereAfterDelete(memory: Browse, task: { startDate: string | null }): string {
+  return memory.kind === 'schedule' ? plannerUrl(memory.url, task) : backTarget(memory).url;
 }

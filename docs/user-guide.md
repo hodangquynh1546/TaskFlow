@@ -13,6 +13,7 @@ Nút nhỏ ở góc trên (và trên trang đăng nhập) mở bảng chọn: **
 Số việc theo trạng thái, số việc quá hạn, việc sắp đến hạn và việc mới cập nhật.
 
 ## Công việc
+Mỗi việc trong danh sách có ba nút tròn như trên lịch: **vàng** chuyển sang Đang làm, **xanh lá** đánh dấu Hoàn thành, **đỏ** xóa (có hỏi xác nhận). Bấm lại nút của trạng thái hiện tại thì việc về **Chưa làm**. Trạng thái hiện tại hiện bằng nhãn ngay trên thẻ. Muốn sửa, bấm vào tên việc rồi bấm Sửa ở trang chi tiết.
 - **Tạo công việc**: tiêu đề (bắt buộc), mô tả, mức ưu tiên (Thấp, Trung bình, Cao), trạng thái (Chưa làm, Đang làm, Hoàn thành), ngày và giờ bắt đầu, thời lượng, hạn hoàn thành (chọn ngày).
 - **Thời lượng**: chọn nhanh 15 phút, 30 phút, 1, 2, 3, 4 giờ, hoặc "Khác" để nhập số phút (1 đến 1440). Form báo giờ kết thúc. Việc phải kết thúc trong cùng ngày, tới 24:00.
 - **Danh sách**: tìm theo tiêu đề, lọc theo trạng thái, ưu tiên, hạn; sắp xếp; phân trang. Bộ lọc nằm trên địa chỉ trang nên có thể lưu hoặc gửi lại chính màn hình đó.
@@ -20,7 +21,7 @@ Số việc theo trạng thái, số việc quá hạn, việc sắp đến hạ
 - Việc quá hạn là việc có hạn đã qua mà chưa Hoàn thành.
 
 ## Quay lại từ một việc
-Mở một việc từ đâu thì nút quay lại, nút Hủy, lưu, và xóa đều đưa bạn về đúng nơi đó: Tổng quan, Lịch (đúng ngày hoặc tuần đang xem), Hồ sơ, hoặc danh sách với bộ lọc cũ. Nhãn của nút quay lại cũng đổi theo ("Lịch", "Tổng quan"...). Mở việc bằng liên kết trực tiếp thì quay lại danh sách công việc.
+Mở một việc từ đâu thì nút quay lại, nút Hủy, lưu, và xóa đều đưa bạn về đúng nơi đó (từ Lịch tuần thì về Lịch tuần, đúng tuần của việc): Tổng quan, Lịch (đúng ngày hoặc tuần đang xem), Hồ sơ, hoặc danh sách với bộ lọc cũ. Nhãn của nút quay lại cũng đổi theo ("Lịch", "Tổng quan"...). Mở việc bằng liên kết trực tiếp thì quay lại danh sách công việc.
 
 ## Việc lặp lại
 Khi tạo hoặc sửa việc, chọn **Lặp lại** (hằng ngày, tuần, tháng, năm) và bấm lưu: các lần lặp kế tiếp được tạo ngay, tối đa 12 việc (hoặc đến ngày kết thúc lặp nếu có), nên bạn thấy chúng trong danh sách và lịch. Hoàn thành việc cuối cùng của chuỗi thì các lần tiếp theo được tạo tiếp. Sửa một việc trong chuỗi chỉ đổi việc đó.
@@ -33,6 +34,7 @@ Chọn **Lịch** để xem các việc theo trục giờ. Nút **Ngày** / **Tu
 - Lịch mở ở giờ hiện tại. Việc đang diễn ra mà bắt đầu từ trước đó vẫn hiện tiêu đề và giờ ở đầu vùng nhìn khi bạn cuộn.
 - Việc trùng giờ hiện cạnh nhau. Việc có giờ bắt đầu nhưng chưa có thời lượng hiện thành khối 30 phút nét đứt (ước lượng).
 - Rê chuột vào một việc trên lịch: góc phải hiện ba nút tròn như cửa sổ Mac. **Vàng** chuyển sang Đang làm, **xanh lá** đánh dấu Hoàn thành (đổi ngay tại chỗ, không tải lại lịch), **đỏ** xóa việc (có hỏi xác nhận như khi xóa ở danh sách). Nút của trạng thái hiện tại hiện dạng đã nhấn. Trên màn hình cảm ứng: chạm một lần vào việc để hiện ba nút (nút to hơn), chạm lần nữa vào việc đó để mở chi tiết, chạm ra ngoài để ẩn nút. Dùng bàn phím: Tab tới việc rồi tới các nút.
+- **Chọn nhiều:** nút **Chọn nhiều** (cạnh Thêm việc) bật chế độ chọn: bấm vào các việc để chọn hoặc bỏ chọn (việc chọn có viền cam và dấu tích), **Chọn tất cả** chọn mọi việc đang hiện, **Xóa đã chọn** xóa hết sau một lần xác nhận. Việc nào không xóa được vẫn ở trạng thái đã chọn để thử lại. **Xong** hoặc phím Esc thoát chế độ này.
 - Bấm vào ô trống để tạo việc tại giờ đó; ngày và giờ đã được điền sẵn.
 
 ## Hồ sơ

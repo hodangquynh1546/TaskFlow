@@ -5,7 +5,13 @@
 .nav__step { min-width: 42px; padding-inline: 0; }
 .nav__picker { width: 15.5rem; }
 
-.summary { min-height: 1.5rem; margin-bottom: var(--tf-space-4); color: var(--tf-ink-soft); font-weight: 500; }
+.summary-row { min-height: 2.5rem; margin-bottom: var(--tf-space-4); }
+.summary { min-height: 1.5rem; color: var(--tf-ink-soft); font-weight: 500; }
+
+// Picking several: a bar in the place of the summary line (so the planner does not move), with what can be done.
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-2); }
+.bulk__count { margin: 0 var(--tf-space-3) 0 0; font-weight: 700; }
+.nav__select--on { background: var(--tf-lemon); border-color: var(--tf-edge); font-weight: 700; }
 .summary__range { color: var(--tf-ink); font-weight: 700; margin-right: var(--tf-space-2); }
 
 // Day / Week switch: two buttons in one outlined pill; the pressed one is filled, so state shows without colour alone.

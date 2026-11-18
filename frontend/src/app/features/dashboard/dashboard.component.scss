@@ -7,10 +7,18 @@
   overscroll-behavior: contain;
   // Room for the panels' offset shadows, which the scroll box would otherwise clip.
   padding: 2px 10px 12px 2px;
+  // The panels grow to fill the window (below), so the page does not end in empty space on a tall one.
+  display: flex;
+  flex-direction: column;
 }
 
 // Bento: panels of different sizes, not a row of identical cards.
-.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--tf-space-6); align-items: stretch; }
+.grid { flex: 1 0 auto; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--tf-space-6); align-items: stretch; }
+
+// Wide layout is three rows (hero and progress, the two lists, the report): the report takes whatever height is left.
+@media (min-width: 1200px) {
+  .grid:has(.report-wide) { grid-template-rows: auto auto minmax(min-content, 1fr); }
+}
 
 .hero { grid-column: span 8; display: flex; align-items: center; gap: var(--tf-space-6); padding: var(--tf-space-6) var(--tf-space-8); background: var(--tf-hero); box-shadow: var(--tf-shadow-panel); }
 .hero__ti { flex: none; }
@@ -25,7 +33,7 @@
 .overdue { display: flex; flex-wrap: wrap; gap: var(--tf-space-1) var(--tf-space-4); align-items: center; margin-top: var(--tf-space-3); }
 .overdue__text { font-weight: 700; }
 
-.report-wide { grid-column: 1 / -1; display: block; }
+.report-wide { grid-column: 1 / -1; display: flex; min-height: 0; }
 .list-panel { grid-column: span 5; padding: var(--tf-space-6); }
 .list-panel--wide { grid-column: span 7; }
 .list-title { font-size: var(--tf-text-h3); margin-bottom: var(--tf-space-3); }

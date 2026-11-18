@@ -10,6 +10,7 @@ import { I18nService } from '../../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../../core/i18n/translate.pipe';
 import { burstConfetti } from '../../../core/motion/confetti';
 import { BrowseMemory, backTarget } from '../../../core/navigation/browse-memory';
+import { whereAfterDelete } from '../create/previous-page';
 import { NotifyService } from '../../../core/notify/notify.service';
 import { STATUS_KEYS, TASK_STATUSES, TaskStatus } from '../../../shared/models/task.models';
 import { ConfirmService } from '../../../shared/ui/confirm.service';
@@ -81,7 +82,7 @@ export class TaskDetailComponent {
     this.tasks.delete(current.id).subscribe({
       next: () => {
         this.notify.success(this.i18n.t('toast.deleted'));
-        void this.router.navigateByUrl(this.back().url);
+        void this.router.navigateByUrl(whereAfterDelete(this.memory.last(), current));
       },
       error: (error: ApiError) => {
         this.busy.set(false);

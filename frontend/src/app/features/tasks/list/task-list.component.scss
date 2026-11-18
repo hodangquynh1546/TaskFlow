@@ -56,12 +56,12 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  grid-template-areas: 'main menu' 'meta meta' 'status status';
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'main actions' 'meta meta';
   align-items: center;
   column-gap: var(--tf-space-2);
   row-gap: var(--tf-space-2);
-  padding: var(--tf-space-3) var(--tf-space-2) var(--tf-space-3) var(--tf-space-4);
+  padding: var(--tf-space-3) var(--tf-space-4);
   transition: transform 180ms var(--tf-ease-pop), box-shadow 180ms ease, opacity 200ms ease;
 
   &:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--tf-shadow-color); }
@@ -77,27 +77,7 @@
   &__time { margin-top: 2px; }
   &__description { margin-top: 2px; color: var(--tf-ink-soft); font-size: var(--tf-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   &__meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-2) var(--tf-space-4); }
-  &__status { grid-area: status; display: flex; }
-  &__menu { grid-area: menu; min-width: 44px; min-height: 44px; padding: 0; align-self: start; }
-}
-
-// Three buttons instead of a select: the state is visible and one click changes it.
-.seg {
-  display: inline-flex; border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-pill); overflow: hidden; background: var(--tf-paper);
-
-  &__btn {
-    flex: 1; min-height: 40px; padding: 0 var(--tf-space-2); border: 0; background: transparent; color: var(--tf-ink-soft);
-    font: inherit; font-size: var(--tf-text-caption); font-weight: 700; white-space: nowrap; cursor: pointer;
-    transition: background-color 160ms ease, transform 160ms var(--tf-ease-pop);
-    & + & { border-inline-start: 2px solid var(--tf-edge); }
-    &:hover:not(:disabled):not([aria-pressed='true']) { background: var(--tf-lemon-tint); color: var(--tf-ink); }
-    &:active:not(:disabled) { transform: scale(0.94); }
-    &:disabled { cursor: progress; }
-    &[aria-pressed='true'] { color: var(--tf-on-color); cursor: default; }
-    &--Todo[aria-pressed='true'] { background: var(--tf-sky); }
-    &--InProgress[aria-pressed='true'] { background: var(--tf-lemon); }
-    &--Completed[aria-pressed='true'] { background: var(--tf-mint); }
-  }
+  &__actions { grid-area: actions; align-self: start; }
 }
 
 // The row a new task landed on: two soft pulses so the eye finds it after the scroll.
@@ -110,7 +90,6 @@
 .sk { height: 76px; border-radius: var(--tf-radius-sticker); }
 
 .pager { flex: none; display: flex; justify-content: flex-end; padding-top: var(--tf-space-3); }
-:host ::ng-deep .menu-danger { font-weight: 700; }
 
 // Tablet and below: filters collapse behind a button.
 @media (max-width: 767.98px) {

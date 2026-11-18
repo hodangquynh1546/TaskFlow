@@ -13,11 +13,20 @@ export class ConfirmService {
    * clicking outside) resolves false. "Keep" is focused first, so an accidental Enter cannot delete.
    */
   confirmDelete(taskTitle: string): Promise<boolean> {
+    return this.ask(this.i18n.t('confirm.deleteTitle', { title: taskTitle }), this.i18n.t('confirm.deleteBody'));
+  }
+
+  /** The same question for several tasks at once: it names how many, not which. */
+  confirmDeleteMany(count: number): Promise<boolean> {
+    return this.ask(this.i18n.t('confirm.deleteManyTitle', { count }), this.i18n.t('confirm.deleteManyBody'));
+  }
+
+  private ask(title: string, body: string): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       let confirmed = false;
       const ref = this.modal.confirm({
-        nzTitle: this.i18n.t('confirm.deleteTitle', { title: taskTitle }),
-        nzContent: this.i18n.t('confirm.deleteBody'),
+        nzTitle: title,
+        nzContent: body,
         nzOkText: this.i18n.t('confirm.deleteOk'),
         nzOkDanger: true,
         nzCancelText: this.i18n.t('confirm.deleteKeep'),

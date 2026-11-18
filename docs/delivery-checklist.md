@@ -34,6 +34,10 @@ Kiểm tra ngày 2026-11-12.
 - [x] Ba nút trên khối lịch dùng được trên cảm ứng (chạm chọn, chạm lần hai mở chi tiết, chạm ra ngoài ẩn); 7 test mới; thử trên Chromium giả lập `hover: none`/`pointer: coarse` bằng sự kiện chạm CDP, bắt được và sửa lỗi chạm góc phải mở hộp xóa
 - [x] Quay lại/hủy/lưu/xóa về đúng trang đã mở việc (Tổng quan, Lịch ngày/tuần, Hồ sơ, danh sách có bộ lọc): test mới cho `classifyBrowse`, `backTarget`, `whereAfterSave` và các trang chi tiết/tạo; thử trên trình duyệt thật từ Lịch tuần và Tổng quan, gồm xóa
 - [x] Tiêu đề và giờ của việc đang diễn ra dính mép trên vùng nhìn trong Lịch ngày và tuần (đo trên trình duyệt: khối lệch -250px vẫn có tiêu đề ở +4px)
+- [x] Chọn nhiều và xóa hàng loạt trên Lịch ngày/tuần (10 test mới; thử trên trình duyệt thật: chọn 3 việc ở tuần, một lần xác nhận, xóa, Esc)
+- [x] Trang Công việc: ba nút tròn thay nhóm nút trạng thái và menu ba chấm; bấm lại nút hiện tại về Chưa làm
+- [x] Sau tạo/sửa/xóa từ Lịch tuần quay về Lịch tuần đúng tuần của việc (`whereAfterSave`, `whereAfterDelete`)
+- [x] Tổng quan: hết khoảng trống dưới báo cáo kéo hết cỡ (nguyên nhân: bảng ẩn `position: absolute` kéo dài vùng cuộn; đã bọc trong div); đo trên trình duyệt: khoảng cách dưới báo cáo luôn 12px ở cửa sổ 700 đến 1700px
 - [ ] Còn làm: nhắc việc trên điện thoại và đồng bộ local-first (cần máy chủ, chưa có)
 - [x] Hạn hoàn thành không còn nhập tay: máy chủ tự tính từ giờ bắt đầu + thời lượng (11 test), form bỏ ô hạn và hiện "Kết thúc và đến hạn lúc …"; gợi ý tiêu đề theo tiền tố từ các tiêu đề đã dùng (9 test tích hợp, kiểm "đ" ra đã dạy/động/đen, "đã" chỉ còn đã dạy); khung giờ trong danh sách có màu theo trạng thái
 - [x] Đã gỡ mục "Đến hạn trong ngày/tuần, chưa xếp giờ" khỏi Lịch theo yêu cầu (vốn hầu như luôn trống): bỏ cột phải, lời gọi `dueOn` và các chuỗi dịch; Lịch ngày chỉ còn trục giờ (rộng tối đa 52rem)

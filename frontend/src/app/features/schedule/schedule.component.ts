@@ -5,8 +5,8 @@ import { Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
 import { NzIconModule } from 'ng-zorro-antd/icon';
-import { BehaviorSubject, EMPTY, combineLatest, forkJoin, switchMap, tap } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { BehaviorSubject, EMPTY, combineLatest, firstValueFrom, forkJoin, from, of, switchMap, tap, toArray } from 'rxjs';
+import { catchError, map, mergeMap } from 'rxjs/operators';
 
 import { ApiError } from '../../core/http/api-error';
 import { burstConfetti } from '../../core/motion/confetti';
@@ -21,7 +21,7 @@ import { formatDay, parseDay } from '../tasks/task-query';
 import { TaskService } from '../tasks/task.service';
 import { blockLabel, clock } from './block-label';
 import { DayLayout, HOUR_HEIGHT, PX_PER_MINUTE, SHORT_BLOCK_HEIGHT, ScheduledBlock, VISIBLE_HOURS_DAY, VISIBLE_HOURS_WEEK, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
-import { BlockActionsComponent } from './block-actions.component';
+import { BlockActionsComponent } from '../../shared/ui/block-actions.component';
 import { WeekGridComponent } from './week-grid.component';
 
 export { PX_PER_MINUTE };
@@ -46,7 +46,7 @@ interface DayData {
   selector: 'tf-schedule',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, BlockActionsComponent, ErrorStateComponent, TranslatePipe, WeekGridComponent],
-  host: { '(window:resize)': 'fit()', '(document:click)': 'dismissSelection($event)' },
+  host: { '(window:resize)': 'fit()', '(document:click)': 'dismissSelection($event)', '(document:keydown.escape)': 'leaveSelecting()' },
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
 })
@@ -70,6 +70,11 @@ export class ScheduleComponent {
 
   /** On a touch screen: the block that was tapped once, whose buttons are showing. */
   protected readonly selectedId = signal<string | null>(null);
+
+  /** Several-at-once mode: blocks are picked instead of opened, and the picked ones can be deleted together. */
+  protected readonly selecting = signal(false);
+  protected readonly picked = signal<ReadonlySet<string>>(new Set());
+  protected readonly bulkBusy = signal(false);
 
   /** Ids of the tasks whose status change or deletion is in flight. */
   protected readonly busy = signal<ReadonlySet<string>>(new Set());
@@ -172,6 +177,7 @@ export class ScheduleComponent {
         tap(() => {
           this.state.set('loading');
           this.selectedId.set(null);
+          this.picked.set(new Set());
         }),
         switchMap(([key]) => {
           const day = key.slice(key.indexOf(':') + 1);
@@ -258,6 +264,10 @@ export class ScheduleComponent {
    * there is no hover, so the first tap only shows the buttons and a second tap on the same block opens the task.
    */
   protected tapBlock(id: string): void {
+    if (this.selecting()) {
+      this.togglePick(id);
+      return;
+    }
     if (this.touch() && this.selectedId() !== id) {
       this.selectedId.set(id);
     }
@@ -268,7 +278,72 @@ export class ScheduleComponent {
    * RouterLink navigates whatever a click handler does), so the first tap can only show its buttons.
    */
   protected link(id: string): string[] | null {
-    return this.touch() && this.selectedId() !== id ? null : ['/tasks', id];
+    // Picking several: a block is only something to pick, so it leads nowhere.
+    return this.selecting() || (this.touch() && this.selectedId() !== id) ? null : ['/tasks', id];
+  }
+
+  protected toggleSelecting(): void {
+    this.selecting.update((on) => !on);
+    this.picked.set(new Set());
+    this.selectedId.set(null);
+  }
+
+  protected leaveSelecting(): void {
+    if (this.selecting() && !this.bulkBusy()) {
+      this.toggleSelecting();
+    }
+  }
+
+  protected togglePick(id: string): void {
+    if (this.bulkBusy()) {
+      return;
+    }
+    this.picked.update((set) => {
+      const next = new Set(set);
+      if (!next.delete(id)) {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  protected pickAll(): void {
+    this.picked.set(new Set((this.data()?.scheduled ?? []).map((t) => t.id)));
+  }
+
+  protected clearPicks(): void {
+    this.picked.set(new Set());
+  }
+
+  protected readonly hasTasks = computed(() => (this.data()?.scheduled.length ?? 0) > 0);
+
+  /**
+   * Deletes every picked task after one confirmation. The server has no "delete many", so each goes on its own, a few at
+   * a time; the ones that worked leave the planner, the ones that did not stay picked so the user can try again.
+   */
+  protected async deletePicked(): Promise<void> {
+    const ids = [...this.picked()];
+    if (ids.length === 0 || this.bulkBusy() || !(await this.confirm.confirmDeleteMany(ids.length))) {
+      return;
+    }
+    this.bulkBusy.set(true);
+    const results = await firstValueFrom(
+      from(ids).pipe(
+        mergeMap((id) => this.tasks.delete(id).pipe(map(() => ({ id, ok: true })), catchError(() => of({ id, ok: false }))), 5),
+        toArray(),
+      ),
+    );
+    const gone = new Set(results.filter((r) => r.ok).map((r) => r.id));
+    const failed = results.length - gone.size;
+    this.data.update((d) => d && { ...d, scheduled: d.scheduled.filter((t) => !gone.has(t.id)) });
+    this.picked.set(new Set(results.filter((r) => !r.ok).map((r) => r.id)));
+    this.bulkBusy.set(false);
+    if (gone.size > 0) {
+      this.notify.success(this.i18n.t('toast.deletedMany', { count: gone.size }));
+    }
+    if (failed > 0) {
+      this.notify.error(this.i18n.t('toast.deleteManyFailed', { count: failed }));
+    }
   }
 
   /** A tap anywhere that is not a block or its buttons puts the buttons away again. */
@@ -282,11 +357,12 @@ export class ScheduleComponent {
     return this.busy().has(id);
   }
 
-  /** Yellow or green button on a block. Choosing the status the task already has does nothing. */
-  protected chooseStatus(task: Task, status: TaskStatus, event?: Event): void {
-    if (task.status === status || this.isBusy(task.id)) {
+  /** Yellow or green button on a block. Pressing the one the task already has puts it back to "to do". */
+  protected chooseStatus(task: Task, pressed: TaskStatus, event?: Event): void {
+    if (this.isBusy(task.id)) {
       return;
     }
+    const status: TaskStatus = task.status === pressed ? 'Todo' : pressed;
     this.markBusy(task.id, true);
     this.tasks.changeStatus(task.id, status).subscribe({
       next: (changed) => {
@@ -296,7 +372,7 @@ export class ScheduleComponent {
         this.notify.success(
           changed.next
             ? this.i18n.t('toast.nextCreated', { when: this.i18n.formatDateTime(changed.next.startDate) })
-            : this.i18n.t(status === 'Completed' ? 'toast.completed' : 'toast.toDoing'),
+            : this.i18n.t(status === 'Completed' ? 'toast.completed' : status === 'InProgress' ? 'toast.toDoing' : 'toast.toTodo'),
         );
         if (status === 'Completed') {
           const box = (event?.currentTarget as HTMLElement | null)?.getBoundingClientRect();

@@ -45,6 +45,13 @@
 .act--done { background: var(--tf-mint); }
 .act--delete { background: var(--tf-alarm); color: #fff; }
 
+// On a row of the list: in the flow, always there, a little larger than on a block.
+:host(.inline) {
+  position: static; visibility: visible; opacity: 1; transform: none; pointer-events: auto; padding: 0; z-index: auto; align-items: center;
+  transition: none;
+  .act { position: static; width: 32px; height: 32px; svg { width: 16px; height: 16px; } }
+}
+
 // A finger needs more room than a pointer.
 @media (pointer: coarse) {
   .act { width: 28px; height: 28px; svg { width: 14px; height: 14px; } }

@@ -51,7 +51,10 @@
           </figure>
         </div>
 
-        <table class="tf-visually-hidden">
+        <!-- The wrapper is what is hidden: a table does not clip to a 1px box, and a hidden table that overflows still lengthens
+             the scroll area of the page, leaving blank space under the report. -->
+        <div class="tf-visually-hidden">
+        <table>
           <caption>{{ 'report.tableAria' | t }}, {{ rangeText() }}</caption>
           <thead>
             <tr><th scope="col">{{ 'report.col.period' | t }}</th><th scope="col">{{ 'report.col.hours' | t }}</th><th scope="col">{{ 'report.col.tasks' | t }}</th></tr>
@@ -62,6 +65,7 @@
             }
           </tbody>
         </table>
+        </div>
       } @else {
         <p class="empty">{{ 'report.empty' | t }}</p>
       }

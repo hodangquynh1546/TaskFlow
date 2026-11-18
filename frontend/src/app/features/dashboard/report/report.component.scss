@@ -1,4 +1,4 @@
-.report { padding: var(--tf-space-6); }
+.report { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: var(--tf-space-6); }
 .report__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tf-space-3) var(--tf-space-6); margin-bottom: var(--tf-space-4); }
 .report__title { font-size: var(--tf-text-h3); }
 .report__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tf-space-3); }
@@ -18,7 +18,7 @@
 .stepper__btn { min-width: 42px; padding-inline: 0; }
 .stepper__range { min-width: 10.5rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.report__body { transition: opacity 180ms ease; }
+.report__body { flex: 1; min-height: 0; display: flex; flex-direction: column; transition: opacity 180ms ease; }
 .report__body--busy { opacity: 0.55; }
 
 .tiles { list-style: none; margin: 0 0 var(--tf-space-6); padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: var(--tf-space-3); }
@@ -26,7 +26,10 @@
 .tile__value { font-family: var(--tf-font-display); font-weight: 800; font-size: 1.75rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .tile__label { color: var(--tf-ink-soft); font-size: var(--tf-text-small); font-weight: 600; }
 
-.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tf-space-8); }
+// The charts take the height the page has left (never less than 14rem) and the bars grow with it: cqh is the height of
+// this box, and 6rem is what each chart spends on its caption and its day labels.
+.charts { flex: 1; min-height: 14rem; container-type: size; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tf-space-8); }
+tf-bar-chart { --chart-h: clamp(160px, calc(100cqh - 6rem), 380px); }
 .chart { margin: 0; min-width: 0; }
 .chart figcaption { margin-bottom: var(--tf-space-4); font-weight: 700; }
 
@@ -35,7 +38,9 @@
 .sk { height: 14rem; border-radius: var(--tf-radius-sticker); }
 
 @media (max-width: 899.98px) {
-  .charts { grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-6); }
+  // One chart above the other: each gets its own height again instead of sharing the box.
+  .charts { container-type: normal; grid-template-columns: minmax(0, 1fr); gap: var(--tf-space-6); }
+  tf-bar-chart { --chart-h: 160px; }
 }
 @media (max-width: 599.98px) {
   .report { padding: var(--tf-space-4); }

@@ -1,5 +1,5 @@
 import { Browse } from '../../../core/navigation/browse-memory';
-import { TASK_LIST_URL, pageBeforeCreate, whereAfterSave } from './previous-page';
+import { TASK_LIST_URL, pageBeforeCreate, whereAfterDelete, whereAfterSave } from './previous-page';
 
 describe('pageBeforeCreate', () => {
   it.each([
@@ -54,6 +54,26 @@ describe('whereAfterSave', () => {
     });
   });
 
+  describe('from the week planner', () => {
+    it('stays in the week view, on the week of the day the task starts, asking for its block', () => {
+      expect(whereAfterSave('/schedule?view=week&date=2026-11-12', OTHER, task({ startDate: LOCAL_NOON }))).toBe('/schedule?view=week&date=2026-11-14&highlight=abc');
+    });
+
+    it('through a task page, the remembered week view is restored', () => {
+      const memory: Browse = { kind: 'schedule', url: '/schedule?view=week&date=2026-11-12' };
+
+      expect(whereAfterSave('/tasks/42/edit', memory, task({ id: '42', startDate: LOCAL_NOON }))).toBe('/schedule?view=week&date=2026-11-14&highlight=42');
+    });
+
+    it('a task with no start time stays on the week the user was looking at', () => {
+      expect(whereAfterSave('/schedule?view=week&date=2026-11-12', OTHER, task())).toBe('/schedule?view=week&date=2026-11-12&highlight=abc');
+    });
+
+    it('the day view is not turned into the week view', () => {
+      expect(whereAfterSave('/schedule?view=day&date=2026-11-12', OTHER, task({ startDate: LOCAL_NOON }))).toBe('/schedule?date=2026-11-14&highlight=abc');
+    });
+  });
+
   describe('from the day planner', () => {
     it('returns to the planner on the day the task starts, asking for its block', () => {
       expect(whereAfterSave('/schedule?date=2026-11-12', OTHER, task({ startDate: LOCAL_NOON }))).toBe('/schedule?date=2026-11-14&highlight=abc');
@@ -86,5 +106,27 @@ describe('whereAfterSave', () => {
     it('with no earlier page and nothing remembered, the task list', () => {
       expect(whereAfterSave(undefined, OTHER, task())).toBe('/tasks?highlight=abc');
     });
+  });
+});
+
+describe('whereAfterDelete', () => {
+  const NOON = new Date(2026, 10, 14, 12, 0).toISOString();
+
+  it('returns to the planner in the same view, on the day the deleted task was on', () => {
+    expect(whereAfterDelete({ kind: 'schedule', url: '/schedule?view=week&date=2026-11-12' }, { startDate: NOON })).toBe('/schedule?view=week&date=2026-11-14');
+    expect(whereAfterDelete({ kind: 'schedule', url: '/schedule?date=2026-11-12' }, { startDate: NOON })).toBe('/schedule?date=2026-11-14');
+  });
+
+  it('a task with no start time returns to the day or week that was on screen', () => {
+    expect(whereAfterDelete({ kind: 'schedule', url: '/schedule?view=week&date=2026-11-12' }, { startDate: null })).toBe('/schedule?view=week&date=2026-11-12');
+    expect(whereAfterDelete({ kind: 'schedule', url: '/schedule' }, { startDate: null })).toBe('/schedule');
+  });
+
+  it.each([
+    [{ kind: 'list', url: '/tasks?status=Todo' }, '/tasks?status=Todo'],
+    [{ kind: 'page', url: '/dashboard' }, '/dashboard'],
+    [{ kind: 'other' }, '/tasks'],
+  ] as const)('from %j it is simply the page the task was opened from', (memory, url) => {
+    expect(whereAfterDelete(memory, { startDate: NOON })).toBe(url);
   });
 });

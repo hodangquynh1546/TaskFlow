@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, output, untracked, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { BlockActionsComponent } from './block-actions.component';
+import { BlockActionsComponent } from '../../shared/ui/block-actions.component';
 
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Task, TaskStatus } from '../../shared/models/task.models';
@@ -60,6 +60,9 @@ export class WeekGridComponent {
   /** True on a touch screen: a block that was not tapped yet has no link, so the first tap can only show its buttons. */
   readonly tapToSelect = input(false);
   readonly blockTap = output<string>();
+  /** Picking several tasks: blocks are picked, not opened, and their buttons are hidden. */
+  readonly selecting = input(false);
+  readonly pickedIds = input<ReadonlySet<string>>(new Set());
   readonly statusChosen = output<{ task: Task; status: TaskStatus; event: Event }>();
   readonly removeRequested = output<Task>();
   readonly createAt = output<{ day: string; minute: number }>();
@@ -118,7 +121,7 @@ export class WeekGridComponent {
   }
 
   protected link(id: string): string[] | null {
-    return this.tapToSelect() && this.selectedId() !== id ? null : ['/tasks', id];
+    return this.selecting() || (this.tapToSelect() && this.selectedId() !== id) ? null : ['/tasks', id];
   }
 
   protected hourTop(hour: number): number {

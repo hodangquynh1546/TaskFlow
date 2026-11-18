@@ -31,14 +31,15 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
     </div>
   `,
   styles: `
+    // The caller can give the plot more height with --chart-h (the dashboard grows it to fill a tall window).
     :host { display: block; }
     .chart { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--tf-space-3); }
-    .axis { display: flex; flex-direction: column; justify-content: space-between; height: 160px; text-align: right; color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-variant-numeric: tabular-nums; line-height: 1; transform: translateY(-0.4em); padding-bottom: 0.4em; }
+    .axis { display: flex; flex-direction: column; justify-content: space-between; height: var(--chart-h, 160px); text-align: right; color: var(--tf-ink-soft); font-size: var(--tf-text-caption); font-variant-numeric: tabular-nums; line-height: 1; transform: translateY(-0.4em); padding-bottom: 0.4em; }
     .plot { position: relative; min-width: 0; }
-    .grid { position: absolute; inset: 0 0 auto 0; height: 160px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+    .grid { position: absolute; inset: 0 0 auto 0; height: var(--chart-h, 160px); display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
     .grid span { border-top: 2px dashed var(--tf-line); }
     .grid span:last-child { border-top-style: solid; }
-    .cols { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); align-items: end; height: 160px; gap: clamp(2px, 1.2%, 10px); }
+    .cols { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); align-items: end; height: var(--chart-h, 160px); gap: clamp(2px, 1.2%, 10px); }
     .col { height: 100%; display: flex; align-items: flex-end; justify-content: center; }
     .bar {
       width: 100%; max-width: 44px; min-height: 0; border: 2px solid var(--tf-edge); border-bottom-width: 0; border-radius: 6px 6px 0 0;

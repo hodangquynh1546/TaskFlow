@@ -95,7 +95,8 @@ describe('TaskListComponent', () => {
 
       expect(row.querySelector('.row__description')!.textContent).toBe('Báo cáo quý 4');
       expect(row.querySelector('tf-priority')).toBeNull(); // the list no longer shows the priority marker
-      expect(row.querySelector('.seg__btn--Completed')!.getAttribute('aria-pressed')).toBe('true');
+      expect(row.querySelector('tf-status')!.textContent).toContain('Hoàn thành');
+      expect(row.querySelector('.act--done')!.getAttribute('aria-pressed')).toBe('true');
       expect(row.querySelector('tf-due')).not.toBeNull();
       expect(row.classList.contains('row--done')).toBe(true);
     });
@@ -103,8 +104,16 @@ describe('TaskListComponent', () => {
     it('gives every row action an accessible name that includes the task title', async () => {
       const { el } = await setup('/tasks', of(page([task({ title: 'Họp nhóm' })])));
 
-      expect(el.querySelector('.seg')!.getAttribute('aria-label')).toBe('Trạng thái của Họp nhóm');
-      expect(el.querySelector('.row__menu')!.getAttribute('aria-label')).toBe('Thao tác với Họp nhóm');
+      const names = [...el.querySelectorAll('.row .act')].map((b) => b.getAttribute('aria-label'));
+      expect(names).toEqual(['Chuyển sang Đang làm: Họp nhóm', 'Đánh dấu hoàn thành: Họp nhóm', 'Xóa công việc: Họp nhóm']);
+    });
+
+    it('has no row menu any more: editing is on the task page, one click on the title away', async () => {
+      const { el } = await setup('/tasks', of(page([task({ title: 'Họp nhóm', id: 'a' })])));
+
+      expect(el.querySelector('.row__menu')).toBeNull();
+      expect(el.querySelector('nz-dropdown-menu')).toBeNull();
+      expect(el.querySelector('.row__title')!.getAttribute('href')).toBe('/tasks/a');
     });
   });
 
@@ -322,24 +331,24 @@ describe('TaskListComponent', () => {
   });
 
   describe('changing status from the list', () => {
-    const button = (el: HTMLElement, row: number, status: string) =>
-      el.querySelectorAll('.row')[row].querySelector<HTMLButtonElement>(`.seg__btn--${status}`)!;
+    const act = (el: HTMLElement, row: number, which: 'doing' | 'done' | 'delete') =>
+      el.querySelectorAll('.row')[row].querySelector<HTMLButtonElement>(`.act--${which}`)!;
 
-    it('shows all three statuses on every row and marks the current one', async () => {
+    it('shows the status and three round buttons on every row, and marks the one that is current', async () => {
       const { el } = await setup();
 
-      const labels = [...el.querySelectorAll('.row')[0].querySelectorAll('.seg__btn')].map((b) => b.textContent!.trim());
-      expect(labels).toEqual(['Chưa làm', 'Đang làm', 'Hoàn thành']);
-      expect(button(el, 0, 'Todo').getAttribute('aria-pressed')).toBe('true');
-      expect(button(el, 0, 'Completed').getAttribute('aria-pressed')).toBe('false');
-      expect(button(el, 1, 'Completed').getAttribute('aria-pressed')).toBe('true');
+      expect([...el.querySelectorAll('.row')[0].querySelectorAll('.act')].map((b) => b.classList[1])).toEqual(['act--doing', 'act--done', 'act--delete']);
+      expect(el.querySelector('.seg')).toBeNull(); // no longer a segmented control
+      expect(el.querySelectorAll('.row')[0].querySelector('tf-status')!.textContent).toContain('Chưa làm');
+      expect(act(el, 0, 'done').getAttribute('aria-pressed')).toBe('false');
+      expect(act(el, 1, 'done').getAttribute('aria-pressed')).toBe('true');
     });
 
-    it('"Hoàn thành" finishes an open task, tells the user, and refreshes in place without a skeleton', async () => {
+    it('green finishes an open task, tells the user, and refreshes in place without a skeleton', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(of(task()));
 
-      button(el, 0, 'Completed').click();
+      act(el, 0, 'done').click();
       await settle();
 
       expect(service.changeStatus).toHaveBeenCalledWith('a', 'Completed');
@@ -348,28 +357,38 @@ describe('TaskListComponent', () => {
       expect(el.querySelector('[aria-busy="true"]')).toBeNull();
     });
 
-    it('"Đang làm" and "Chưa làm" set exactly that status', async () => {
+    it('yellow starts a task', async () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(of(task()));
 
-      button(el, 0, 'InProgress').click();
+      act(el, 0, 'doing').click();
       await settle();
+
       expect(service.changeStatus).toHaveBeenLastCalledWith('a', 'InProgress');
       expect(notify.success).toHaveBeenLastCalledWith('Đã chuyển sang Đang làm');
+    });
 
-      button(el, 1, 'Todo').click();
+    it('pressing the button of the status a task already has puts it back to "to do"', async () => {
+      const { el, service, notify, settle } = await setup();
+      service.changeStatus.mockReturnValue(of(task()));
+
+      act(el, 1, 'done').click(); // row 1 is finished
       await settle();
+
       expect(service.changeStatus).toHaveBeenLastCalledWith('b', 'Todo');
       expect(notify.success).toHaveBeenLastCalledWith('Đã chuyển sang Chưa làm');
     });
 
-    it('pressing the status a task already has sends nothing', async () => {
-      const { el, service, settle } = await setup();
+    it('red asks first, naming the task, and deletes only when confirmed', async () => {
+      const { el, service, confirm, notify, settle } = await setup();
+      service.delete.mockReturnValue(of(undefined));
 
-      button(el, 0, 'Todo').click();
+      act(el, 0, 'delete').click();
       await settle();
 
-      expect(service.changeStatus).not.toHaveBeenCalled();
+      expect(confirm.confirmDelete).toHaveBeenCalledWith('Việc A');
+      expect(service.delete).toHaveBeenCalledWith('a');
+      expect(notify.success).toHaveBeenCalledWith('Đã xóa công việc');
     });
 
     it('finishing a repeating task says when the next one is, instead of only "done"', async () => {
@@ -377,7 +396,7 @@ describe('TaskListComponent', () => {
       const nextStart = new Date(2026, 10, 21, 9, 0).toISOString();
       service.changeStatus.mockReturnValue(of(task({ status: 'Completed', next: { id: 'n1', startDate: nextStart } })));
 
-      button(el, 0, 'Completed').click();
+      act(el, 0, 'done').click();
       await settle();
 
       expect(notify.success).toHaveBeenCalledWith('Đã hoàn thành. Việc kế tiếp: 21/11/2026 09:00');
@@ -398,7 +417,7 @@ describe('TaskListComponent', () => {
       const { el, service, notify, settle } = await setup();
       service.changeStatus.mockReturnValue(throwError(() => new ApiError(404, 'Không tìm thấy công việc.')));
 
-      button(el, 0, 'Completed').click();
+      act(el, 0, 'done').click();
       await settle();
 
       expect(notify.error).toHaveBeenCalledWith('Không tìm thấy công việc.');
@@ -408,7 +427,7 @@ describe('TaskListComponent', () => {
     it('a row is locked while its change is in flight, so a double click sends one request', async () => {
       const { el, service, settle } = await setup();
       service.changeStatus.mockReturnValue(new Subject());
-      const done = button(el, 0, 'Completed');
+      const done = act(el, 0, 'done');
 
       done.click();
       await settle();
@@ -486,39 +505,6 @@ describe('TaskListComponent', () => {
 
       expect(service.position).toHaveBeenCalledTimes(1);
       expect(notify.info).not.toHaveBeenCalled(); // no filters were hiding anything: nothing to explain
-    });
-  });
-
-  describe('row menu placement', () => {
-    const buttonAt = (bottom: number) => {
-      const button = document.createElement('button');
-      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ bottom } as DOMRect);
-      return { currentTarget: button } as unknown as Event;
-    };
-
-    it('opens downward when there is room, and upward when it would run under the tab bar', async () => {
-      const { component } = await setup();
-      const bar = document.createElement('tf-tab-bar');
-      vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue({ top: 770, height: 72 } as DOMRect);
-      document.body.append(bar);
-
-      component['placeMenu'](buttonAt(300));
-      expect(component['menuPlacement']()).toBe('bottomRight');
-
-      component['placeMenu'](buttonAt(700));
-      expect(component['menuPlacement']()).toBe('topRight');
-
-      bar.remove();
-    });
-
-    it('with no tab bar (desktop) only the window edge matters', async () => {
-      const { component } = await setup();
-
-      component['placeMenu'](buttonAt(window.innerHeight - 20));
-      expect(component['menuPlacement']()).toBe('topRight');
-
-      component['placeMenu'](buttonAt(100));
-      expect(component['menuPlacement']()).toBe('bottomRight');
     });
   });
 

@@ -5,10 +5,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
-import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzInputModule } from 'ng-zorro-antd/input';
-import { NzMenuModule } from 'ng-zorro-antd/menu';
 import { NzPaginationModule } from 'ng-zorro-antd/pagination';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { BehaviorSubject, EMPTY, combineLatest, debounceTime, distinctUntilChanged, map, of, switchMap, tap } from 'rxjs';
@@ -31,7 +29,9 @@ import {
   TaskStatus,
 } from '../../../shared/models/task.models';
 import { DueLabelComponent } from '../../../shared/ui/due-label.component';
+import { BlockActionsComponent } from '../../../shared/ui/block-actions.component';
 import { ConfirmService } from '../../../shared/ui/confirm.service';
+import { StatusIndicatorComponent } from '../../../shared/ui/status-indicator.component';
 import { EmptyStateComponent } from '../../../shared/ui/empty-state.component';
 import { ErrorStateComponent } from '../../../shared/ui/error-state.component';
 import { RepeatLabelComponent } from '../../../shared/ui/repeat-label.component';
@@ -50,8 +50,6 @@ import {
 } from '../task-query';
 import { TaskService } from '../task.service';
 
-/** Room an open row menu needs below its button: two items, a divider and the shadow. */
-const MENU_HEIGHT = 130;
 /** How long a new task's row stays lit. */
 const FLASH_MS = 2400;
 
@@ -69,8 +67,8 @@ const SORT_KEYS: Readonly<Record<TaskSortField, MessageKey>> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule, ReactiveFormsModule, RouterLink,
-    NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzDropDownModule, NzIconModule, NzInputModule, NzMenuModule, NzPaginationModule, NzSelectModule,
-    DueLabelComponent, EmptyStateComponent, ErrorStateComponent, RepeatLabelComponent, TimeBlockComponent, TranslatePipe,
+    NzButtonModule, NzCheckboxModule, NzDatePickerModule, NzIconModule, NzInputModule, NzPaginationModule, NzSelectModule,
+    BlockActionsComponent, DueLabelComponent, EmptyStateComponent, ErrorStateComponent, RepeatLabelComponent, StatusIndicatorComponent, TimeBlockComponent, TranslatePipe,
   ],
   templateUrl: './task-list.component.html',
   styleUrl: './task-list.component.scss',
@@ -123,7 +121,6 @@ export class TaskListComponent {
   protected readonly busy = signal<ReadonlySet<string>>(new Set());
 
   /** Opens upward when a downward menu would run under the bottom tab bar (phones), which it would otherwise cover. */
-  protected readonly menuPlacement = signal<'bottomRight' | 'topRight'>('bottomRight');
 
   protected readonly searchControl = new FormControl('', { nonNullable: true });
 
@@ -287,25 +284,14 @@ export class TaskListComponent {
     void this.router.navigateByUrl('/tasks/new');
   }
 
-  protected placeMenu(event: Event): void {
-    const button = event.currentTarget;
-    if (!(button instanceof HTMLElement)) {
-      return;
-    }
-    const bar = document.querySelector('tf-tab-bar');
-    const floor = bar && bar.getBoundingClientRect().height > 0 ? bar.getBoundingClientRect().top : window.innerHeight;
-    this.menuPlacement.set(button.getBoundingClientRect().bottom + MENU_HEIGHT > floor ? 'topRight' : 'bottomRight');
-  }
-
   protected isBusy(id: string): boolean {
     return this.busy().has(id);
   }
 
-  /** One of the three status buttons; pressing the current status does nothing. */
-  protected chooseStatus(task: Task, status: TaskStatus, event?: Event): void {
-    if (task.status !== status) {
-      this.setTaskStatus(task, status, status === 'Completed' ? this.centerOf(event) : undefined);
-    }
+  /** The yellow or green button of a row; pressing the one the task already has puts it back to "to do". */
+  protected chooseStatus(task: Task, pressed: TaskStatus, event?: Event): void {
+    const status: TaskStatus = task.status === pressed ? 'Todo' : pressed;
+    this.setTaskStatus(task, status, status === 'Completed' ? this.centerOf(event) : undefined);
   }
 
   protected setTaskStatus(task: Task, status: TaskStatus, celebrateAt?: { x: number; y: number }): void {
