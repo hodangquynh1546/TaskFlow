@@ -139,6 +139,91 @@ describe('ScheduleComponent, week view: buttons on a block', () => {
   });
 });
 
+describe('ScheduleComponent, remembering the view', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    localStorage.removeItem('tf.planner.view');
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.removeItem('tf.planner.view');
+  });
+
+  it('with nothing chosen yet the planner opens on the day', async () => {
+    const { el } = await setup('/schedule');
+
+    expect(el.querySelector('.timeline')).not.toBeNull();
+    expect(el.querySelector('tf-week-grid')).toBeNull();
+  });
+
+  it('choosing the week is remembered: opening the planner with no view in the address shows the week again', async () => {
+    const first = await setup('/schedule');
+    [...first.el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Tuần')!.click();
+    await first.settle();
+    expect(localStorage.getItem('tf.planner.view')).toBe('week');
+
+    TestBed.resetTestingModule();
+    const again = await setup('/schedule'); // what the menu link opens
+
+    expect(again.el.querySelector('tf-week-grid')).not.toBeNull();
+    expect(again.service.forDay).toHaveBeenCalledTimes(7);
+  });
+
+  it('choosing the day is remembered too', async () => {
+    localStorage.setItem('tf.planner.view', 'week');
+    const first = await setup('/schedule');
+    [...first.el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Ngày')!.click();
+    await first.settle();
+
+    TestBed.resetTestingModule();
+    const again = await setup('/schedule');
+
+    expect(again.el.querySelector('.timeline')).not.toBeNull();
+  });
+
+  it('a view in the address wins over the remembered one, without overwriting it', async () => {
+    localStorage.setItem('tf.planner.view', 'week');
+
+    const day = await setup('/schedule?view=day&date=2026-11-12');
+
+    expect(day.el.querySelector('.timeline')).not.toBeNull();
+    expect(localStorage.getItem('tf.planner.view')).toBe('week');
+  });
+
+  it('an unknown view in the address is the day planner, whatever was remembered', async () => {
+    localStorage.setItem('tf.planner.view', 'week');
+
+    const { el } = await setup('/schedule?view=month');
+
+    expect(el.querySelector('.timeline')).not.toBeNull();
+  });
+
+  it('moving between weeks or days keeps the view, even though the address does not name it', async () => {
+    localStorage.setItem('tf.planner.view', 'week');
+    const { el, router, settle } = await setup('/schedule');
+
+    el.querySelector<HTMLButtonElement>('button[aria-label="Tuần sau"]')!.click();
+    await settle();
+
+    expect(router.url).toBe('/schedule?date=2026-11-27');
+    expect(el.querySelector('tf-week-grid')).not.toBeNull();
+  });
+
+  it('works when browser storage is blocked: the view still switches, it is just not remembered', async () => {
+    const blocked = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const { el, settle } = await setup('/schedule');
+
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Tuần')!.click();
+    await settle();
+
+    expect(el.querySelector('tf-week-grid')).not.toBeNull();
+    blocked.mockRestore();
+  });
+});
+
 describe('ScheduleComponent, week view', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -327,7 +412,7 @@ describe('ScheduleComponent, week view', () => {
 
       button(el, 'Ngày').click();
       await settle();
-      expect(router.url).toBe('/schedule?date=2026-11-12');
+      expect(router.url).toBe('/schedule?date=2026-11-12&view=day');
       expect(el.querySelector('.timeline')).not.toBeNull();
     });
   });

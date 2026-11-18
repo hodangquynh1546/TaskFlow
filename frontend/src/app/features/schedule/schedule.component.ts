@@ -22,6 +22,7 @@ import { TaskService } from '../tasks/task.service';
 import { blockLabel, clock } from './block-label';
 import { DayLayout, HOUR_HEIGHT, PX_PER_MINUTE, SHORT_BLOCK_HEIGHT, ScheduledBlock, VISIBLE_HOURS_DAY, VISIBLE_HOURS_WEEK, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
 import { BlockActionsComponent } from '../../shared/ui/block-actions.component';
+import { readViewPreference, saveViewPreference } from './view-preference';
 import { WeekGridComponent } from './week-grid.component';
 
 export { PX_PER_MINUTE };
@@ -97,7 +98,13 @@ export class ScheduleComponent {
   protected readonly hourHeight = signal(HOUR_HEIGHT);
   private readonly pxPerMinute = computed(() => this.hourHeight() / 60);
   private readonly summaryElement = viewChild<ElementRef<HTMLElement>>('summaryLine');
-  protected readonly isWeek = computed(() => this.view() === 'week');
+  /** What the user chose last time: used when the address does not say. */
+  private readonly preferredView = signal(readViewPreference());
+  /** The address wins ("week" or "day"); with no view in it, the remembered one; anything else is the day planner. */
+  protected readonly isWeek = computed(() => {
+    const requested = this.view();
+    return requested === undefined ? this.preferredView() === 'week' : requested === 'week';
+  });
   protected readonly week = computed(() => weekDays(this.day()));
   protected readonly weekLayouts = computed(() => layoutWeek(this.week(), this.data()?.scheduled ?? []));
   protected readonly weekRange = computed(() => {
@@ -451,7 +458,10 @@ export class ScheduleComponent {
   }
 
   protected setView(view: 'day' | 'week'): void {
-    void this.router.navigate([], { queryParams: { view: view === 'week' ? 'week' : null }, queryParamsHandling: 'merge' });
+    saveViewPreference(view);
+    this.preferredView.set(view);
+    // Always written to the address, "day" included: with no view in it the remembered one would apply.
+    void this.router.navigate([], { queryParams: { view }, queryParamsHandling: 'merge' });
   }
 
   /** A free slot in the week grid: the new-task form opens set to that column's day and hour. */

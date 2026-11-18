@@ -69,8 +69,8 @@ describe('whereAfterSave', () => {
       expect(whereAfterSave('/schedule?view=week&date=2026-11-12', OTHER, task())).toBe('/schedule?view=week&date=2026-11-12&highlight=abc');
     });
 
-    it('the day view is not turned into the week view', () => {
-      expect(whereAfterSave('/schedule?view=day&date=2026-11-12', OTHER, task({ startDate: LOCAL_NOON }))).toBe('/schedule?date=2026-11-14&highlight=abc');
+    it('an explicit day view stays the day view (the remembered view would otherwise apply)', () => {
+      expect(whereAfterSave('/schedule?view=day&date=2026-11-12', OTHER, task({ startDate: LOCAL_NOON }))).toBe('/schedule?view=day&date=2026-11-14&highlight=abc');
     });
   });
 

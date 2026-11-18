@@ -38,6 +38,7 @@ Kiểm tra ngày 2026-11-12.
 - [x] Trang Công việc: ba nút tròn thay nhóm nút trạng thái và menu ba chấm; bấm lại nút hiện tại về Chưa làm
 - [x] Sau tạo/sửa/xóa từ Lịch tuần quay về Lịch tuần đúng tuần của việc (`whereAfterSave`, `whereAfterDelete`)
 - [x] Tổng quan: hết khoảng trống dưới báo cáo kéo hết cỡ (nguyên nhân: bảng ẩn `position: absolute` kéo dài vùng cuộn; đã bọc trong div); đo trên trình duyệt: khoảng cách dưới báo cáo luôn 12px ở cửa sổ 700 đến 1700px
+- [x] Lịch nhớ chế độ Ngày/Tuần giữa các lần mở (7 test mới; thử trên trình duyệt thật: chọn Tuần, đi Tổng quan/Hồ sơ/Công việc, bấm lại Lịch vẫn là tuần)
 - [ ] Còn làm: nhắc việc trên điện thoại và đồng bộ local-first (cần máy chủ, chưa có)
 - [x] Hạn hoàn thành không còn nhập tay: máy chủ tự tính từ giờ bắt đầu + thời lượng (11 test), form bỏ ô hạn và hiện "Kết thúc và đến hạn lúc …"; gợi ý tiêu đề theo tiền tố từ các tiêu đề đã dùng (9 test tích hợp, kiểm "đ" ra đã dạy/động/đen, "đã" chỉ còn đã dạy); khung giờ trong danh sách có màu theo trạng thái
 - [x] Đã gỡ mục "Đến hạn trong ngày/tuần, chưa xếp giờ" khỏi Lịch theo yêu cầu (vốn hầu như luôn trống): bỏ cột phải, lời gọi `dueOn` và các chuỗi dịch; Lịch ngày chỉ còn trục giờ (rộng tối đa 52rem)

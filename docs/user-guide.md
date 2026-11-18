@@ -27,7 +27,7 @@ Mở một việc từ đâu thì nút quay lại, nút Hủy, lưu, và xóa đ
 Khi tạo hoặc sửa việc, chọn **Lặp lại** (hằng ngày, tuần, tháng, năm) và bấm lưu: các lần lặp kế tiếp được tạo ngay, tối đa 12 việc (hoặc đến ngày kết thúc lặp nếu có), nên bạn thấy chúng trong danh sách và lịch. Hoàn thành việc cuối cùng của chuỗi thì các lần tiếp theo được tạo tiếp. Sửa một việc trong chuỗi chỉ đổi việc đó.
 
 ## Lịch (ngày và tuần)
-Chọn **Lịch** để xem các việc theo trục giờ. Nút **Ngày** / **Tuần** ở đầu trang đổi cách xem. Lịch ngày thấy sẵn 8 khung giờ, lịch tuần 7 khung; kéo để xem phần còn lại.
+Chọn **Lịch** để xem các việc theo trục giờ. Nút **Ngày** / **Tuần** ở đầu trang đổi cách xem, và app nhớ lựa chọn: sang trang khác rồi bấm lại **Lịch** ở menu (hoặc mở lại app) thì vẫn là chế độ bạn dùng gần nhất. Lịch ngày thấy sẵn 8 khung giờ, lịch tuần 7 khung; kéo để xem phần còn lại.
 - Chuyển ngày (hoặc tuần) bằng nút trước/sau, ô chọn ngày hoặc **Hôm nay**.
 - **Tuần** hiện bảy cột từ Thứ Hai đến Chủ Nhật trên cùng một trục giờ; cột hôm nay được tô nổi. Bấm vào ô trống của một cột để tạo việc vào đúng ngày và giờ đó. Trên điện thoại, kéo ngang để xem các cột; trục giờ và tên ngày đứng yên khi cuộn.
 - Ở chế độ Tuần, mỗi ngày hiển thị tối đa 50 việc đầu tiên.

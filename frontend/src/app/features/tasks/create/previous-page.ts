@@ -53,9 +53,10 @@ function plannerUrl(plannerUrlBefore: string, task: { startDate: string | null }
   const params = new URLSearchParams(plannerUrlBefore.split('?')[1] ?? '');
   const day = task.startDate ? formatDay(new Date(task.startDate)) : params.get('date');
   const next = new URLSearchParams();
-  // The week view must survive: the task lands in its own place in the week, not on a single day.
-  if (params.get('view') === 'week') {
-    next.set('view', 'week');
+  // The view must survive: the task lands in its own place in the week, or on its day, as the user had it.
+  const view = params.get('view');
+  if (view === 'week' || view === 'day') {
+    next.set('view', view);
   }
   if (day) {
     next.set('date', day);
