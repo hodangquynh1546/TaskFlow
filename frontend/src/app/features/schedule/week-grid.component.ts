@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, Injector, afterNextRend
 import { RouterLink } from '@angular/router';
 
 import { BlockActionsComponent } from '../../shared/ui/block-actions.component';
+import { BlockDragDirective, BlockDragEvent } from './block-drag.directive';
 
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Task, TaskStatus } from '../../shared/models/task.models';
@@ -31,7 +32,7 @@ export interface WeekColumn {
 @Component({
   selector: 'tf-week-grid',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, BlockActionsComponent],
+  imports: [RouterLink, BlockActionsComponent, BlockDragDirective],
   templateUrl: './week-grid.component.html',
   styleUrl: './week-grid.component.scss',
 })
@@ -65,6 +66,11 @@ export class WeekGridComponent {
   readonly pickedIds = input<ReadonlySet<string>>(new Set());
   readonly statusChosen = output<{ task: Task; status: TaskStatus; event: Event }>();
   readonly removeRequested = output<Task>();
+  /** False while picking several tasks or deleting: blocks cannot be dragged then. */
+  readonly dragAllowed = input(true);
+  /** A block is being dragged: with how many columns it has moved sideways, so the planner can work out the new day. */
+  readonly blockDrag = output<{ task: Task; dayShift: number; event: BlockDragEvent }>();
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly createAt = output<{ day: string; minute: number }>();
 
   protected readonly hours = HOURS;
@@ -118,6 +124,21 @@ export class WeekGridComponent {
     }
     const starts = columns.flatMap((c) => c.layout.blocks.map((b) => b.startMinute));
     return starts.length ? Math.max(0, COLUMN_MARGIN_TOP + (Math.min(...starts) - 60) * this.pxPerMinute()) : 0;
+  }
+
+  protected canDrag(id: string): boolean {
+    return this.dragAllowed() && !this.busyIds().has(id);
+  }
+
+  protected dragged(fromDay: string, task: Task, event: BlockDragEvent): void {
+    this.blockDrag.emit({ task, dayShift: this.columnAt(event.x) - this.days().indexOf(fromDay), event });
+  }
+
+  /** The column under a screen x: outside the grid it is the nearest edge column, so a drag past the side still lands somewhere. */
+  private columnAt(x: number): number {
+    const boxes = [...this.host.nativeElement.querySelectorAll<HTMLElement>('.week__col')].map((c) => c.getBoundingClientRect());
+    const found = boxes.findIndex((b) => x >= b.left && x < b.right);
+    return found >= 0 ? found : x < (boxes[0]?.left ?? 0) ? 0 : boxes.length - 1;
   }
 
   protected link(id: string): string[] | null {

@@ -18,7 +18,7 @@ const block = (id: string, h: number, m: number, duration: number | null, patch:
   aTask({ id, title: `Việc ${id}`, startDate: at(h, m), durationMinutes: duration, ...patch });
 
 async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn() };
+  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn(), update: vi.fn() };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
@@ -42,7 +42,7 @@ async function setup(url = `/schedule?date=${DAY}`, scheduled: unknown = of(page
 }
 
 async function setupWithComponent(url: string, scheduled: unknown = of(paged([]))) {
-  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn() };
+  const service = { forDay: vi.fn().mockReturnValue(scheduled), changeStatus: vi.fn(), delete: vi.fn(), update: vi.fn() };
   TestBed.configureTestingModule({
     providers: [
       ...UI_TEST_PROVIDERS,
@@ -270,6 +270,208 @@ describe('ScheduleComponent, buttons on a block', () => {
     slow.next(aTask({ id: 'a', startDate: at(9), status: 'Completed' }));
     await settle();
     expect(acts(el).done.disabled).toBe(false);
+  });
+});
+
+describe('ScheduleComponent, dragging a block to another time', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    notify.error.mockClear();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** A pointer event of the kind a mouse sends; jsdom has no PointerEvent, so the pointer fields are added by hand. */
+  const pointer = (type: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+    Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: 'mouse' }, ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, { value: v }])) });
+    return event;
+  };
+  const drag = async (target: Element, from: [number, number], to: [number, number], settle: () => Promise<void>, release = true) => {
+    target.dispatchEvent(pointer('pointerdown', ...from));
+    window.dispatchEvent(pointer('pointermove', ...to));
+    await settle();
+    if (release) {
+      window.dispatchEvent(pointer('pointerup', ...to));
+      await settle();
+    }
+  };
+  const nine = () => of(paged([block('a', 9, 0, 60, { priority: 'High', description: 'mô tả' })]));
+  const tip = (el: HTMLElement) => el.querySelector('.drag-tip');
+
+  it('a block is draggable by default, and says so; the link itself is not dragged by the browser', async () => {
+    const { el } = await setup(undefined, nine());
+
+    expect(blocks(el)[0].classList.contains('block--draggable')).toBe(true);
+    // A link is natively draggable: left alone, the browser starts dragging its address and cancels the pointer events.
+    expect(blocks(el)[0].getAttribute('draggable')).toBe('false');
+    const native = new Event('dragstart', { bubbles: true, cancelable: true });
+    blocks(el)[0].dispatchEvent(native);
+    expect(native.defaultPrevented).toBe(true);
+  });
+
+  it('while dragging, the block follows the pointer and a label says where it would land', async () => {
+    const { el, settle } = await setup(undefined, nine());
+
+    await drag(blocks(el)[0], [100, 100], [100, 136], settle, false); // +36px is +30 minutes
+
+    expect(blocks(el)[0].classList.contains('block--dragging')).toBe(true);
+    expect(blocks(el)[0].style.transform).toBe('translate(0px, 36px)'); // the day view only moves up and down
+    expect(tip(el)!.textContent).toBe('09:30–10:30');
+  });
+
+  it('releasing saves the whole task with only its start changed, moves the block at once, and says where it went', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    service.update.mockReturnValue(of(aTask({ id: 'a', title: 'Việc a', startDate: at(9, 30), durationMinutes: 60 })));
+
+    await drag(blocks(el)[0], [100, 100], [100, 136], settle);
+
+    expect(service.update).toHaveBeenCalledTimes(1);
+    expect(service.update).toHaveBeenCalledWith('a', expect.objectContaining({
+      title: 'Việc a', description: 'mô tả', priority: 'High', status: 'Todo', durationMinutes: 60, recurrence: null,
+      startDate: new Date(2026, 10, 12, 9, 30).toISOString(),
+    }));
+    expect(blocks(el)[0].style.transform).toBe('');
+    expect(tip(el)).toBeNull();
+    expect(Number.parseFloat(blocks(el)[0].style.top)).toBeCloseTo((9 * 60 + 30) * PX_PER_MINUTE, 5);
+    expect(notify.success.mock.calls[0][0]).toMatch(/^Đã chuyển sang /);
+    expect(service.forDay).toHaveBeenCalledTimes(1); // nothing was reloaded
+  });
+
+  it('keeps a repeat when it moves a repeating task', async () => {
+    const rule = { frequency: 'Daily' as const, interval: 1, weekdays: 0, until: null, utcOffsetMinutes: 420 };
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 9, 0, 60, { recurrence: rule })])));
+    service.update.mockReturnValue(of(aTask({ id: 'a', startDate: at(9, 15), recurrence: rule })));
+
+    await drag(blocks(el)[0], [0, 0], [0, 18], settle);
+
+    expect(service.update.mock.calls[0][1].recurrence).toEqual(rule);
+  });
+
+  it('the block is on its new place while the save is in flight, and the buttons wait', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    const slow = new Subject<Task>();
+    service.update.mockReturnValue(slow);
+
+    await drag(blocks(el)[0], [0, 0], [0, 36], settle);
+
+    expect(Number.parseFloat(blocks(el)[0].style.top)).toBeCloseTo((9 * 60 + 30) * PX_PER_MINUTE, 5);
+    expect(blocks(el)[0].classList.contains('block--draggable')).toBe(false); // busy: it cannot be dragged again
+    expect(el.querySelector<HTMLButtonElement>('tf-block-actions .act--done')!.disabled).toBe(true);
+    slow.next(aTask({ id: 'a', startDate: at(9, 30), durationMinutes: 60 }));
+    await settle();
+    expect(blocks(el)[0].classList.contains('block--draggable')).toBe(true);
+  });
+
+  it('puts the block back and shows the server message when the save fails', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    service.update.mockReturnValue(throwError(() => new ApiError(400, 'Ngày kết thúc lặp không được trước ngày bắt đầu.')));
+
+    await drag(blocks(el)[0], [0, 0], [0, 36], settle);
+
+    expect(notify.error).toHaveBeenCalledWith('Ngày kết thúc lặp không được trước ngày bắt đầu.');
+    expect(Number.parseFloat(blocks(el)[0].style.top)).toBeCloseTo(9 * 60 * PX_PER_MINUTE, 5);
+  });
+
+  it('a drag too short for one step saves nothing and the block stays', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+
+    await drag(blocks(el)[0], [0, 0], [0, 7], settle); // past the click threshold, under half a step
+
+    expect(service.update).not.toHaveBeenCalled();
+    expect(tip(el)).toBeNull();
+  });
+
+  it('a press that barely moves is a click, not a drag: no label, no transform, no save', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+
+    await drag(blocks(el)[0], [0, 0], [2, 2], settle);
+
+    expect(blocks(el)[0].classList.contains('block--dragging')).toBe(false);
+    expect(blocks(el)[0].style.transform).toBe('');
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('Esc puts the block back and saves nothing, and letting go afterwards does not open the task', async () => {
+    const { el, router, service, settle } = await setup(undefined, nine());
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    await drag(blocks(el)[0], [0, 0], [0, 36], settle, false);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await settle();
+    expect(blocks(el)[0].style.transform).toBe('');
+    expect(tip(el)).toBeNull();
+
+    window.dispatchEvent(pointer('pointerup', 0, 36));
+    blocks(el)[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(service.update).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('the click that follows a drop does not open the task', async () => {
+    const { el, router, service, settle } = await setup(undefined, nine());
+    service.update.mockReturnValue(of(aTask({ id: 'a', startDate: at(9, 30) })));
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    await drag(blocks(el)[0], [0, 0], [0, 36], settle);
+    blocks(el)[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); // what the browser sends after the release
+    await settle();
+
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('an ordinary click, with no drag before it, still opens the task', async () => {
+    const { el, router, settle } = await setup(undefined, nine());
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    await drag(blocks(el)[0], [0, 0], [1, 1], settle);
+    blocks(el)[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('a touch pointer does not drag: scrolling and tapping keep their meaning on a touch screen', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    blocks(el)[0].dispatchEvent(pointer('pointerdown', 0, 0, { pointerType: 'touch' }));
+    window.dispatchEvent(pointer('pointermove', 0, 60, { pointerType: 'touch' }));
+    window.dispatchEvent(pointer('pointerup', 0, 60, { pointerType: 'touch' }));
+    await settle();
+
+    expect(blocks(el)[0].classList.contains('block--dragging')).toBe(false);
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('only the main button drags', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    blocks(el)[0].dispatchEvent(pointer('pointerdown', 0, 0, { button: 2 }));
+    window.dispatchEvent(pointer('pointermove', 0, 60));
+    window.dispatchEvent(pointer('pointerup', 0, 60));
+    await settle();
+
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('while picking several tasks, blocks are not draggable', async () => {
+    const { el, service, settle } = await setup(undefined, nine());
+    [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === 'Chọn nhiều')!.click();
+    await settle();
+
+    expect(blocks(el)[0].classList.contains('block--draggable')).toBe(false);
+    await drag(blocks(el)[0], [0, 0], [0, 36], settle);
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('dragging up moves earlier, and a block cannot be carried past midnight', async () => {
+    const { el, service, settle } = await setup(undefined, of(paged([block('a', 23, 0, 60)])));
+    service.update.mockReturnValue(of(aTask({ id: 'a', startDate: at(23, 45) })));
+
+    await drag(blocks(el)[0], [0, 0], [0, 400], settle);
+
+    expect(service.update.mock.calls[0][1].startDate).toBe(new Date(2026, 10, 12, 23, 45).toISOString());
   });
 });
 
@@ -513,7 +715,7 @@ describe('ScheduleComponent, tapping a block on a touch screen', () => {
 
   it('works the same in the week grid', async () => {
     const original = window.matchMedia;
-    const service = { forDay: vi.fn((day: string) => of(paged(day === '2026-11-12' ? [block('a', 9, 0, 60, { startDate: at(9) })] : []))), changeStatus: vi.fn(), delete: vi.fn() };
+    const service = { forDay: vi.fn((day: string) => of(paged(day === '2026-11-12' ? [block('a', 9, 0, 60, { startDate: at(9) })] : []))), changeStatus: vi.fn(), delete: vi.fn(), update: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         ...UI_TEST_PROVIDERS,

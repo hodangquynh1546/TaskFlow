@@ -26,6 +26,7 @@ async function setup(url: string, tasks: Task[] = [], configure?: (service: { fo
   const service = {
     changeStatus: vi.fn(),
     delete: vi.fn(),
+    update: vi.fn(),
     forDay: vi.fn((day: string) => of(paged(tasks.filter((t) => t.startDate !== null && formatDay(new Date(t.startDate)) === day)))),
   };
   configure?.(service);
@@ -54,6 +55,101 @@ async function setup(url: string, tasks: Task[] = [], configure?: (service: { fo
 const columns = (el: HTMLElement) => [...el.querySelectorAll<HTMLElement>('.week__col')];
 const blocksIn = (col: HTMLElement) => [...col.querySelectorAll<HTMLElement>('a.block')];
 const button = (el: HTMLElement, label: string) => [...el.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent!.trim() === label || b.getAttribute('aria-label') === label)!;
+
+describe('ScheduleComponent, week view: dragging a block', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 20, 12, 0));
+    notify.success.mockClear();
+    // Columns are 100px wide, side by side from x = 0: jsdom lays nothing out, so the grid is described to it.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const index = this.classList.contains('week__col') ? [...(this.parentElement?.querySelectorAll('.week__col') ?? [])].indexOf(this) : -1;
+      const left = index >= 0 ? index * 100 : 0;
+      return { left, right: index >= 0 ? left + 100 : 0, top: 0, bottom: 0, width: index >= 0 ? 100 : 0, height: 0, x: left, y: 0, toJSON: () => ({}) };
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  const pointer = (type: string, x: number, y: number) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 });
+    Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } });
+    return event;
+  };
+
+  it('dragging sideways moves the task to the day under the pointer, keeping its time, and the label names the day', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 9, 9, 0, 60)]); // Monday 9
+    service.update.mockImplementation((_id: string, payload: { startDate: string }) => of({ ...task('a', 9, 9, 0, 60), startDate: payload.startDate }));
+    const block = blocksIn(columns(el)[0])[0];
+
+    block.dispatchEvent(pointer('pointerdown', 50, 100));
+    window.dispatchEvent(pointer('pointermove', 250, 100)); // two columns to the right
+    await settle();
+    expect(block.style.transform).toBe('translate(200px, 0px)');
+    expect(el.querySelector('.drag-tip')!.textContent).toMatch(/09:00–10:00$/);
+    expect(el.querySelector('.drag-tip')!.textContent).toMatch(/11/); // 11 Nov... the Wednesday
+
+    window.dispatchEvent(pointer('pointerup', 250, 100));
+    await settle();
+
+    expect(service.update.mock.calls[0][1].startDate).toBe(new Date(2026, 10, 11, 9, 0).toISOString());
+    expect(columns(el).map((c) => blocksIn(c).length)).toEqual([0, 0, 1, 0, 0, 0, 0]);
+    expect(service.forDay).toHaveBeenCalledTimes(7); // no reload
+  });
+
+  it('moves in time and in day at once', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 12, 9, 0, 60)]); // Thursday 12
+    service.update.mockImplementation((_id: string, payload: { startDate: string }) => of({ ...task('a', 12, 9, 0, 60), startDate: payload.startDate }));
+    const block = blocksIn(columns(el)[3])[0];
+
+    block.dispatchEvent(pointer('pointerdown', 350, 100));
+    window.dispatchEvent(pointer('pointermove', 150, 136)); // one column to the left of Tuesday: two left, and 30 minutes later
+    window.dispatchEvent(pointer('pointerup', 150, 136));
+    await settle();
+
+    expect(service.update.mock.calls[0][1].startDate).toBe(new Date(2026, 10, 10, 9, 30).toISOString());
+  });
+
+  it('carried past the side of the grid, it lands in the nearest column', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 9, 9, 0, 60)]);
+    service.update.mockImplementation((_id: string, payload: { startDate: string }) => of({ ...task('a', 9, 9, 0, 60), startDate: payload.startDate }));
+    const block = blocksIn(columns(el)[0])[0];
+
+    block.dispatchEvent(pointer('pointerdown', 50, 100));
+    window.dispatchEvent(pointer('pointermove', 5000, 100));
+    window.dispatchEvent(pointer('pointerup', 5000, 100));
+    await settle();
+
+    expect(service.update.mock.calls[0][1].startDate).toBe(new Date(2026, 10, 15, 9, 0).toISOString()); // Sunday
+  });
+
+  it('dropped back in its own column and place, nothing is saved', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 9, 9, 0, 60)]);
+    const block = blocksIn(columns(el)[0])[0];
+
+    block.dispatchEvent(pointer('pointerdown', 50, 100));
+    window.dispatchEvent(pointer('pointermove', 70, 104)); // moved, but within the column and under a step
+    window.dispatchEvent(pointer('pointerup', 70, 104));
+    await settle();
+
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('a failed save puts the block back in its own column', async () => {
+    const { el, service, settle } = await setup('/schedule?view=week&date=2026-11-12', [task('a', 9, 9, 0, 60)]);
+    service.update.mockReturnValue(throwError(() => new ApiError(500, 'Lỗi.')));
+    const block = blocksIn(columns(el)[0])[0];
+
+    block.dispatchEvent(pointer('pointerdown', 50, 100));
+    window.dispatchEvent(pointer('pointermove', 250, 100));
+    window.dispatchEvent(pointer('pointerup', 250, 100));
+    await settle();
+
+    expect(columns(el).map((c) => blocksIn(c).length)).toEqual([1, 0, 0, 0, 0, 0, 0]);
+  });
+});
 
 describe('ScheduleComponent, week view: selecting several tasks', () => {
   beforeEach(() => {

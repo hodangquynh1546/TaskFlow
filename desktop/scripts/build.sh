@@ -32,6 +32,12 @@ APP="$HERE/dist/mac-arm64/TaskFlow.app"
 [ -d "$APP" ] || { echo "The build did not produce $APP" >&2; exit 1; }
 
 step "Signing (ad hoc)"
+# Signing in place can fail on newer macOS with "resource fork, Finder information, or similar detritus not allowed" (the
+# files the build wrote carry attributes that xattr cannot remove). A fresh copy made without extended attributes signs
+# fine, so that copy is what gets signed and installed.
+CLEAN="$(mktemp -d)/TaskFlow.app"
+ditto --noextattr --norsrc "$APP" "$CLEAN"
+APP="$CLEAN"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP" && echo "signature ok"
 du -sh "$APP" | awk '{print "TaskFlow.app: " $1}'

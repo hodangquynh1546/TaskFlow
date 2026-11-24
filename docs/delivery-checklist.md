@@ -39,6 +39,7 @@ Kiểm tra ngày 2026-11-12.
 - [x] Sau tạo/sửa/xóa từ Lịch tuần quay về Lịch tuần đúng tuần của việc (`whereAfterSave`, `whereAfterDelete`)
 - [x] Tổng quan: hết khoảng trống dưới báo cáo kéo hết cỡ (nguyên nhân: bảng ẩn `position: absolute` kéo dài vùng cuộn; đã bọc trong div); đo trên trình duyệt: khoảng cách dưới báo cáo luôn 12px ở cửa sổ 700 đến 1700px
 - [x] Lịch nhớ chế độ Ngày/Tuần giữa các lần mở (7 test mới; thử trên trình duyệt thật: chọn Tuần, đi Tổng quan/Hồ sơ/Công việc, bấm lại Lịch vẫn là tuần)
+- [x] Kéo thả đổi giờ/ngày trên Lịch ngày và tuần: test cho hàm `movedStart` và các test hành vi (nhãn, lưu đủ trường, giữ lặp, hoàn tác khi lỗi, Esc, cú click sau thả, chuột phải, chạm, chọn nhiều, giữa các cột); thử bằng Chromium thật qua playwright-core với chuột thật, bắt được lỗi `<a>` bị trình duyệt kéo liên kết (jsdom không thấy). Chưa kéo được bằng ngón tay và bằng bàn phím
 - [ ] Còn làm: nhắc việc trên điện thoại và đồng bộ local-first (cần máy chủ, chưa có)
 - [x] Hạn hoàn thành không còn nhập tay: máy chủ tự tính từ giờ bắt đầu + thời lượng (11 test), form bỏ ô hạn và hiện "Kết thúc và đến hạn lúc …"; gợi ý tiêu đề theo tiền tố từ các tiêu đề đã dùng (9 test tích hợp, kiểm "đ" ra đã dạy/động/đen, "đã" chỉ còn đã dạy); khung giờ trong danh sách có màu theo trạng thái
 - [x] Đã gỡ mục "Đến hạn trong ngày/tuần, chưa xếp giờ" khỏi Lịch theo yêu cầu (vốn hầu như luôn trống): bỏ cột phải, lời gọi `dueOn` và các chuỗi dịch; Lịch ngày chỉ còn trục giờ (rộng tối đa 52rem)

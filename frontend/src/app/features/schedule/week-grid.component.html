@@ -27,7 +27,7 @@
           }
 
           @for (block of col.layout.blocks; track block.task.id; let i = $index) {
-            <a class="block" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" [class.block--picked]="pickedIds().has(block.task.id)" [attr.aria-pressed]="selecting() ? pickedIds().has(block.task.id) : null" (click)="blockTap.emit(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
+            <a class="block" [tfBlockDrag]="canDrag(block.task.id)" (drag)="dragged(col.day, block.task, $event)" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" [class.block--picked]="pickedIds().has(block.task.id)" [attr.aria-pressed]="selecting() ? pickedIds().has(block.task.id) : null" (click)="blockTap.emit(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
                [class.block--estimated]="block.estimated" [class.block--flash]="block.task.id === flashId()" [class.block--short]="isShort(block)"
                [routerLink]="link(block.task.id)" [attr.aria-label]="label(block)" [attr.title]="label(block)"
                [style.top.px]="top(block)" [style.height.px]="height(block)"

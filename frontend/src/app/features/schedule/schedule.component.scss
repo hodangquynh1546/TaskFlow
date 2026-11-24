@@ -44,3 +44,10 @@
   .nav > button, .view__option { min-height: 44px; }
   .timeline { margin-left: 3.5rem; }
 }
+
+// The label next to the pointer while a block is dragged: the time it would land on.
+.drag-tip {
+  position: fixed; z-index: 1000; pointer-events: none; padding: 4px var(--tf-space-3);
+  border: 2px solid var(--tf-edge); border-radius: var(--tf-radius-control); background: var(--tf-paper); color: var(--tf-ink);
+  box-shadow: var(--tf-shadow-small); font-size: var(--tf-text-small); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+}

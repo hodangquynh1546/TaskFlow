@@ -63,3 +63,9 @@ tf-block-actions:focus-within { @include shown; }
 // A block picked for deletion with several at once: a thick outline and a tick before the title, so it is not colour alone.
 .block--picked { outline: 4px solid var(--tf-tangerine); outline-offset: 2px; z-index: 6; }
 .block--picked .block__title::before { content: '\2713\00a0'; font-weight: 800; }
+
+// Dragging a block to another time (and, in the week, another day). It follows the pointer through an inline transform,
+// so the hover and entrance animations, which would override or lag behind it, are switched off meanwhile.
+.block--draggable { cursor: grab; }
+.block--dragging { cursor: grabbing; animation: none; transition: none; z-index: 9; opacity: 0.92; box-shadow: 6px 8px 0 var(--tf-shadow-color); user-select: none; }
+.block--dragging + tf-block-actions { display: none; }

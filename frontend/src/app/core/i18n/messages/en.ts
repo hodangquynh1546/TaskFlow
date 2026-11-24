@@ -237,6 +237,7 @@ export const en: Readonly<Record<MessageKey, string>> = {
   'repeat.untilBeforeStart': 'The repeat end date cannot be before the start date.',
   'repeat.title': 'Repeating task',
   'toast.nextCreated': 'Done. The next one is {when}',
+  'toast.moved': 'Moved to {when}',
   'toast.seriesCreated': 'Created {count, plural, one {# repeating task} other {# repeating tasks}}',
   'repeat.createsAhead': 'On save, the next repeats are created right away (up to 12 tasks). Finish the last one and the series carries on.',
   'reminder.title': 'Reminders',

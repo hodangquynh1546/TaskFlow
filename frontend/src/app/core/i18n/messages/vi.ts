@@ -245,6 +245,7 @@ export const vi = {
   'repeat.untilBeforeStart': 'Ngày kết thúc lặp không được trước ngày bắt đầu.',
   'repeat.title': 'Việc lặp lại',
   'toast.nextCreated': 'Đã hoàn thành. Việc kế tiếp: {when}',
+  'toast.moved': 'Đã chuyển sang {when}',
   'toast.seriesCreated': 'Đã tạo {count} việc lặp lại',
   'repeat.createsAhead': 'Khi lưu, các lần lặp tiếp theo được tạo sẵn (tối đa 12 việc). Hoàn thành việc cuối cùng thì chuỗi tiếp tục.',
   'reminder.title': 'Nhắc việc',

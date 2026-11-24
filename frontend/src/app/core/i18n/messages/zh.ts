@@ -229,6 +229,7 @@ export const zh: Readonly<Record<MessageKey, string>> = {
   'repeat.untilBeforeStart': '重复结束日期不能早于开始日期。',
   'repeat.title': '重复任务',
   'toast.nextCreated': '已完成。下一次：{when}',
+  'toast.moved': '已移到 {when}',
   'toast.seriesCreated': '已创建 {count} 个重复任务',
   'repeat.createsAhead': '保存时会立即创建后续的重复任务（最多 12 个）。完成最后一个后，会继续生成下一个。',
   'reminder.title': '提醒',

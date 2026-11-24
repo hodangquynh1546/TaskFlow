@@ -14,13 +14,14 @@ import { NotifyService } from '../../core/notify/notify.service';
 import { ConfirmService } from '../../shared/ui/confirm.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
-import { Task, TaskStatus } from '../../shared/models/task.models';
+import { Task, TaskPayload, TaskStatus } from '../../shared/models/task.models';
 import { ErrorStateComponent } from '../../shared/ui/error-state.component';
 import { formatDuration } from '../../shared/util/duration';
 import { formatDay, parseDay } from '../tasks/task-query';
 import { TaskService } from '../tasks/task.service';
 import { blockLabel, clock } from './block-label';
-import { DayLayout, HOUR_HEIGHT, PX_PER_MINUTE, SHORT_BLOCK_HEIGHT, ScheduledBlock, VISIBLE_HOURS_DAY, VISIBLE_HOURS_WEEK, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
+import { BlockDragDirective, BlockDragEvent } from './block-drag.directive';
+import { DEFAULT_BLOCK_MINUTES, DayLayout, HOUR_HEIGHT, movedStart, PX_PER_MINUTE, SHORT_BLOCK_HEIGHT, ScheduledBlock, VISIBLE_HOURS_DAY, VISIBLE_HOURS_WEEK, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, weekDays } from './schedule-layout';
 import { BlockActionsComponent } from '../../shared/ui/block-actions.component';
 import { readViewPreference, saveViewPreference } from './view-preference';
 import { WeekGridComponent } from './week-grid.component';
@@ -46,7 +47,7 @@ interface DayData {
 @Component({
   selector: 'tf-schedule',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, BlockActionsComponent, ErrorStateComponent, TranslatePipe, WeekGridComponent],
+  imports: [FormsModule, RouterLink, NzButtonModule, NzDatePickerModule, NzIconModule, BlockActionsComponent, BlockDragDirective, ErrorStateComponent, TranslatePipe, WeekGridComponent],
   host: { '(window:resize)': 'fit()', '(document:click)': 'dismissSelection($event)', '(document:keydown.escape)': 'leaveSelecting()' },
   templateUrl: './schedule.component.html',
   styleUrl: './schedule.component.scss',
@@ -65,6 +66,9 @@ export class ScheduleComponent {
 
   /** "week" shows Monday to Sunday around the day; anything else is the single-day planner. */
   readonly view = input<string>();
+
+  /** The label that follows the pointer while a block is dragged: where it would land. */
+  protected readonly dragTip = signal<{ x: number; y: number; label: string } | null>(null);
 
   /** True on a device with no hover (a touch screen): there, buttons come from tapping a block. */
   protected readonly touch = signal(window.matchMedia('(hover: none)').matches);
@@ -358,6 +362,76 @@ export class ScheduleComponent {
     if (this.selectedId() !== null && !(event.target as Element | null)?.closest('a.block, tf-block-actions')) {
       this.selectedId.set(null);
     }
+  }
+
+  /**
+   * A block is being dragged. While it moves, a label says where it would land; on release the task takes the new start
+   * time. `dayShift` is how many columns to the right the week view carried it (always 0 in the day view).
+   */
+  protected drag(task: Task, dayShift: number, event: BlockDragEvent): void {
+    if (event.phase === 'start') {
+      return;
+    }
+    if (event.phase === 'move') {
+      this.dragTip.set({ x: event.x, y: event.y, label: this.dragLabel(task, dayShift, event.dy) });
+      return;
+    }
+    this.dragTip.set(null);
+    if (event.phase === 'drop' && task.startDate) {
+      this.moveTask(task, movedStart(new Date(task.startDate), event.dy, this.pxPerMinute(), dayShift));
+    }
+  }
+
+  private dragLabel(task: Task, dayShift: number, dy: number): string {
+    const start = movedStart(new Date(task.startDate!), dy, this.pxPerMinute(), dayShift);
+    const from = start.getHours() * 60 + start.getMinutes();
+    const time = `${clock(from)}–${clock(Math.min(from + (task.durationMinutes ?? DEFAULT_BLOCK_MINUTES), 24 * 60))}`;
+    if (!this.isWeek()) {
+      return time;
+    }
+    return `${new Intl.DateTimeFormat(this.i18n.locale(), { weekday: 'short', day: 'numeric', month: 'numeric' }).format(start)}, ${time}`;
+  }
+
+  /**
+   * Saves a task at its new start time. The block is moved on the planner at once, and put back if the server says no
+   * (for example a repeat whose end day would now be before the start).
+   */
+  protected moveTask(task: Task, start: Date): void {
+    if (!task.startDate || start.getTime() === new Date(task.startDate).getTime() || this.isBusy(task.id)) {
+      return;
+    }
+    const startDate = start.toISOString();
+    this.markBusy(task.id, true);
+    this.replaceTask({ ...task, startDate });
+    this.tasks.update(task.id, this.payloadAt(task, startDate)).subscribe({
+      next: (saved) => {
+        this.markBusy(task.id, false);
+        this.replaceTask(saved);
+        this.notify.success(this.i18n.t('toast.moved', { when: this.i18n.formatDateTime(start) }));
+      },
+      error: (error: ApiError) => {
+        this.markBusy(task.id, false);
+        this.replaceTask(task);
+        this.notify.error(error.message);
+      },
+    });
+  }
+
+  private replaceTask(task: Task): void {
+    this.data.update((d) => d && { ...d, scheduled: d.scheduled.map((t) => (t.id === task.id ? task : t)) });
+  }
+
+  /** The whole task as it is, with only the start changed: the update replaces every field. The due time follows the start on the server. */
+  private payloadAt(task: Task, startDate: string): TaskPayload {
+    return {
+      title: task.title, description: task.description, priority: task.priority, status: task.status,
+      startDate, dueDate: null, durationMinutes: task.durationMinutes, recurrence: task.recurrence ?? null,
+    };
+  }
+
+  /** Dragging is for the mouse and pen, and not while picking several tasks or while this task is being saved. */
+  protected canDrag(id: string): boolean {
+    return !this.selecting() && !this.bulkBusy() && !this.isBusy(id);
   }
 
   protected isBusy(id: string): boolean {

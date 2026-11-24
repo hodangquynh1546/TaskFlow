@@ -229,6 +229,7 @@ export const ja: Readonly<Record<MessageKey, string>> = {
   'repeat.untilBeforeStart': '繰り返しの終了日は開始日より前にできません。',
   'repeat.title': '繰り返しのタスク',
   'toast.nextCreated': '完了しました。次回: {when}',
+  'toast.moved': '{when}に移動しました',
   'toast.seriesCreated': '繰り返しのタスクを{count}件作成しました',
   'repeat.createsAhead': '保存すると、次回以降のタスクがすぐに作成されます（最大12件）。最後のタスクを完了すると続きが作成されます。',
   'reminder.title': 'リマインダー',

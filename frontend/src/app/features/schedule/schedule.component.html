@@ -57,7 +57,7 @@
 
       <div class="board" [style.--hour-h.px]="hourHeight()">
         @if (isWeek()) {
-          <tf-week-grid [hourHeight]="hourHeight()" [selecting]="selecting()" [pickedIds]="picked()" [busyIds]="busy()" [selectedId]="selectedId()" [tapToSelect]="touch()" (blockTap)="tapBlock($event)" (statusChosen)="chooseStatus($event.task, $event.status, $event.event)" (removeRequested)="remove($event)" [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
+          <tf-week-grid [hourHeight]="hourHeight()" [dragAllowed]="!selecting() && !bulkBusy()" (blockDrag)="drag($event.task, $event.dayShift, $event.event)" [selecting]="selecting()" [pickedIds]="picked()" [busyIds]="busy()" [selectedId]="selectedId()" [tapToSelect]="touch()" (blockTap)="tapBlock($event)" (statusChosen)="chooseStatus($event.task, $event.status, $event.event)" (removeRequested)="remove($event)" [days]="week()" [layouts]="weekLayouts()" [today]="today()" [now]="now()" [flashId]="flashId()"
                         [highlight]="highlight()" [direction]="direction()" (createAt)="createOn($event)" />
         } @else {
         <div class="board__panel tf-panel">
@@ -73,7 +73,7 @@
               }
 
               @for (block of layout().blocks; track block.task.id; let i = $index) {
-                <a class="block" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" [class.block--picked]="picked().has(block.task.id)" [attr.aria-pressed]="selecting() ? picked().has(block.task.id) : null" (click)="tapBlock(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
+                <a class="block" [tfBlockDrag]="canDrag(block.task.id)" axis="y" (drag)="drag(block.task, 0, $event)" [class]="'block block--' + block.task.status" [class.block--selected]="block.task.id === selectedId()" [class.block--picked]="picked().has(block.task.id)" [attr.aria-pressed]="selecting() ? picked().has(block.task.id) : null" (click)="tapBlock(block.task.id)" [attr.role]="link(block.task.id) ? null : 'button'" [attr.aria-expanded]="link(block.task.id) ? null : false" [class.block--high]="block.task.priority === 'High'"
                    [class.block--estimated]="block.estimated" [class.block--flash]="block.task.id === flashId()" [class.block--short]="isShort(block)"
                    [routerLink]="link(block.task.id)" [attr.aria-label]="label(block)" [attr.title]="label(block)"
                    [style.top.px]="top(block)" [style.height.px]="height(block)"
@@ -99,4 +99,8 @@
       </div>
     }
   }
+}
+
+@if (dragTip(); as tip) {
+  <div class="drag-tip" aria-hidden="true" [style.left.px]="tip.x + 16" [style.top.px]="tip.y + 16">{{ tip.label }}</div>
 }

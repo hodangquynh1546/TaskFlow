@@ -151,3 +151,25 @@ export function fitHourHeight(availablePx: number, rows: number, fixedPx: number
   const fitted = (availablePx - fixedPx) / rows;
   return Math.round(Math.min(MAX_HOUR_HEIGHT, Math.max(HOUR_HEIGHT, fitted)));
 }
+
+/** Moving a block by dragging snaps to this many minutes. */
+export const DRAG_STEP_MINUTES = 15;
+
+/**
+ * Where a task that starts at `start` lands when its block is dragged `dy` pixels down (negative: up) and `dayShift` days
+ * to the right. The change is whole steps of `DRAG_STEP_MINUTES` from where it was, so a task at 09:07 moves to 09:22 and
+ * not to a round number the user did not ask for, and a drag too short to make a step changes nothing. The time of day
+ * stays inside the day (00:00 to the last step), because a block that would run past midnight is not a task of that day.
+ */
+export function movedStart(start: Date, dy: number, pxPerMinute: number, dayShift: number): Date {
+  const exact = dy / pxPerMinute / DRAG_STEP_MINUTES;
+  // Half a step rounds away from zero both ways, so dragging up and dragging down feel the same.
+  const steps = Math.sign(exact) * Math.round(Math.abs(exact));
+  const minute = start.getHours() * 60 + start.getMinutes();
+  const moved = Math.min(24 * 60 - DRAG_STEP_MINUTES, Math.max(0, minute + steps * DRAG_STEP_MINUTES));
+  // A drag that changes nothing returns the same instant (seconds and all), so the caller can tell nothing moved.
+  if (moved === minute && dayShift === 0) {
+    return new Date(start);
+  }
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + dayShift, Math.floor(moved / 60), moved % 60);
+}

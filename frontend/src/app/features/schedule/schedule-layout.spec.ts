@@ -1,5 +1,5 @@
 import { Task } from '../../shared/models/task.models';
-import { DEFAULT_BLOCK_MINUTES, HOUR_HEIGHT, MAX_HOUR_HEIGHT, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, startOfWeek, weekDays } from './schedule-layout';
+import { DEFAULT_BLOCK_MINUTES, DRAG_STEP_MINUTES, movedStart, HOUR_HEIGHT, MAX_HOUR_HEIGHT, fitHourHeight, layoutDay, layoutWeek, snapToQuarter, startOfWeek, weekDays } from './schedule-layout';
 
 let seq = 0;
 const task = (h: number, m: number, duration: number | null, patch: Partial<Task> = {}): Task => ({
@@ -219,5 +219,56 @@ describe('fitHourHeight', () => {
 
   it('stops growing on a very tall window', () => {
     expect(fitHourHeight(5000, 8, 16)).toBe(MAX_HOUR_HEIGHT);
+  });
+});
+
+describe('movedStart', () => {
+  const PX = 1.2; // pixels per minute: 15 minutes are 18px
+  const at = (h: number, m = 0, day = 12) => new Date(2026, 10, day, h, m);
+
+  it.each([
+    [18, 9, 15],
+    [36, 9, 30],
+    [-36, 8, 30],
+    [180, 11, 30],
+    [-180, 6, 30],
+  ])('dragging %ipx moves a task at 09:00 to %i:%i', (dy, hour, minute) => {
+    expect(movedStart(at(9), dy, PX, 0)).toEqual(at(hour, minute));
+  });
+
+  it('moves in whole steps from where the task was, so an odd start stays odd', () => {
+    expect(movedStart(at(9, 7), 18, PX, 0)).toEqual(at(9, 22));
+  });
+
+  it('a drag shorter than half a step changes nothing, and returns the very same instant', () => {
+    const start = new Date(2026, 10, 12, 9, 7, 31);
+
+    expect(movedStart(start, 8, PX, 0).getTime()).toBe(start.getTime());
+    expect(movedStart(start, -8, PX, 0).getTime()).toBe(start.getTime());
+  });
+
+  it('rounds to the nearest step, half a step away from zero, the same up and down', () => {
+    expect(movedStart(at(9), 8, PX, 0)).toEqual(at(9, 0)); // 6.7 minutes: under half a step
+    expect(movedStart(at(9), 9, PX, 0)).toEqual(at(9, 15)); // 7.5 minutes: exactly half
+    expect(movedStart(at(9), -9, PX, 0)).toEqual(at(8, 45));
+    expect(movedStart(at(9), -8, PX, 0)).toEqual(at(9, 0));
+  });
+
+  it('stays inside the day: nothing before 00:00 and nothing later than the last step', () => {
+    expect(movedStart(at(0, 30), -500, PX, 0)).toEqual(at(0, 0));
+    expect(movedStart(at(23, 0), 500, PX, 0)).toEqual(at(23, 60 - DRAG_STEP_MINUTES));
+  });
+
+  it('carries the day with it, keeping the time when only the day changes', () => {
+    expect(movedStart(at(9, 30), 0, PX, 2)).toEqual(at(9, 30, 14));
+    expect(movedStart(at(9, 30), 0, PX, -3)).toEqual(at(9, 30, 9));
+  });
+
+  it('changes both at once', () => {
+    expect(movedStart(at(9), 36, PX, 1)).toEqual(at(9, 30, 13));
+  });
+
+  it('crosses a month end without trouble', () => {
+    expect(movedStart(new Date(2026, 10, 30, 9, 0), 0, PX, 1)).toEqual(new Date(2026, 11, 1, 9, 0));
   });
 });
