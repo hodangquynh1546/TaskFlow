@@ -1,0 +1,43 @@
+# The Windows installer (NSIS, 64-bit), built from macOS by scripts/build-win.sh. The API and PostgreSQL come from
+# resources-win/ (Windows builds); the Angular build is the same on every platform.
+appId: com.taskflow.desktop
+productName: TaskFlow
+copyright: TaskFlow
+directories:
+  output: dist-win
+  buildResources: build
+files:
+  - main.js
+  - preload.js
+  - loading.html
+  - package.json
+  - src/**/*
+asar: true
+# The API, the web build and PostgreSQL stay as plain files (executables cannot run from inside an asar archive).
+extraResources:
+  - from: resources-win/api
+    to: api
+  - from: resources/web
+    to: web
+  - from: resources-win/postgres
+    to: postgres
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  # Not signed, and the executable's own icon and version info are not rewritten: both need Wine when building on a Mac.
+  # The window, the taskbar and the tray icon are set by the app itself.
+  signAndEditExecutable: false
+nsis:
+  # A guided installer that asks where to put the app, for the current user only: no administrator rights needed.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: TaskFlow
+  runAfterFinish: true
+  # Uninstalling removes the program, never the person's data.
+  deleteAppDataOnUninstall: false
+  artifactName: TaskFlow-Setup-${version}-x64.exe

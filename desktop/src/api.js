@@ -21,7 +21,8 @@ class ApiServer {
     this.spawn = deps.spawn ?? childProcess.spawn;
     this.healthCheck = deps.healthCheck ?? defaultHealthCheck;
     this.isAlive = deps.isAlive ?? defaultIsAlive;
-    this.commandOf = deps.commandOf ?? defaultCommandOf;
+    this.platform = deps.platform ?? process.platform;
+    this.commandOf = deps.commandOf ?? ((pid) => defaultCommandOf(pid, this.platform));
     this.killPid = deps.killPid ?? ((pid, signal) => process.kill(pid, signal));
     this.stopSteps = deps.stopSteps ?? [
       { signal: 'SIGTERM', waitMs: 8_000 },
@@ -60,7 +61,7 @@ class ApiServer {
   /** `TaskManagement.API migrate`: applies pending migrations and exits (non-zero on failure). */
   async migrate() {
     const log = this.openLog();
-    const child = this.spawn(this.binary, ['migrate'], { env: this.environment(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = this.spawn(this.binary, ['migrate'], { env: this.environment(), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     let output = '';
     const collect = (chunk) => {
       output += chunk.toString();
@@ -97,7 +98,7 @@ class ApiServer {
     }
     const pid = Number.parseInt(fs.readFileSync(this.pidFile, 'utf8'), 10);
     fs.rmSync(this.pidFile, { force: true });
-    if (!Number.isInteger(pid) || pid <= 1 || !this.isAlive(pid) || !(this.commandOf(pid) ?? '').startsWith(this.binary)) {
+    if (!Number.isInteger(pid) || pid <= 1 || !this.isAlive(pid) || !samePath(this.commandOf(pid) ?? '', this.binary, this.platform)) {
       return;
     }
     for (const [signal, waitMs] of [['SIGTERM', 8_000], ['SIGKILL', 3_000]]) {
@@ -115,7 +116,7 @@ class ApiServer {
   async start() {
     await this.stopStale();
     const log = this.openLog();
-    const child = this.spawn(this.binary, [], { env: this.environment(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = this.spawn(this.binary, [], { env: this.environment(), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     this.child = child;
     if (this.pidFile && child.pid) {
       fs.writeFileSync(this.pidFile, String(child.pid));
@@ -171,12 +172,24 @@ function defaultIsAlive(pid) {
   }
 }
 
-function defaultCommandOf(pid) {
+/** The command line (macOS) or the program path (Windows) of a process, to be sure a leftover pid is still our API and not an unrelated program that got the number. */
+function defaultCommandOf(pid, platform = process.platform) {
   try {
+    if (platform === 'win32') {
+      return childProcess
+        .execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${Number(pid)} -ErrorAction Stop).Path`], { encoding: 'utf8', windowsHide: true })
+        .trim();
+    }
     return childProcess.execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }).trim();
   } catch {
     return null;
   }
+}
+
+/** Does `command` start with the program's path? Windows paths differ only by case and slash direction. */
+function samePath(command, binary, platform = process.platform) {
+  const norm = (value) => (platform === 'win32' ? value.replaceAll('/', '\\').toLowerCase() : value);
+  return norm(command).startsWith(norm(binary));
 }
 
 function defaultHealthCheck(url) {
@@ -193,4 +206,4 @@ function defaultHealthCheck(url) {
   });
 }
 
-module.exports = { ApiServer };
+module.exports = { ApiServer, samePath };

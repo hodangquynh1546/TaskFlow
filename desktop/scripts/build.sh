@@ -2,6 +2,7 @@
 # Builds TaskFlow.app (Apple Silicon): web build + self-contained API + PostgreSQL + Electron shell.
 # Usage: scripts/build.sh            build only (result: desktop/dist/mac-arm64/TaskFlow.app)
 #        scripts/build.sh --install  also replace ~/Applications/TaskFlow.app
+#        scripts/build.sh --release  also pack release/TaskFlow-<version>-AppleSilicon.dmg to give to other people
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -50,4 +51,9 @@ if [ "${1:-}" = "--install" ]; then
   rm -rf "$HOME/Applications/TaskFlow.app"
   cp -R "$APP" "$HOME/Applications/TaskFlow.app"
   echo "Installed: $HOME/Applications/TaskFlow.app"
+fi
+
+if [ "${1:-}" = "--release" ]; then
+  step "Release disk image"
+  "$HERE/scripts/make-release.sh" "$APP"
 fi

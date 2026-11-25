@@ -1,16 +1,20 @@
 'use strict';
+const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
 const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, shell, safeStorage, session } = require('electron');
-const { resolvePaths } = require('./src/paths');
+const { defaultUserData, resolvePaths } = require('./src/paths');
 const { TaskFlowRuntime } = require('./src/lifecycle');
 const { buildMenuTemplate } = require('./src/menu');
 const { translator } = require('./src/strings');
 const { allowPermission, shouldHideOnClose } = require('./src/policy');
 const { buildTrayMenu } = require('./src/tray');
 
+const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
+
 // Own folder, so it never mixes with the Docker setup's data (~/Library/Application Support/TaskFlow).
-const userData = process.env.TASKFLOW_USER_DATA || path.join(app.getPath('appData'), 'TaskFlow Desktop');
+const userData = process.env.TASKFLOW_USER_DATA || defaultUserData({ appData: app.getPath('appData'), programData: process.env.ProgramData, username: os.userInfo().username });
 app.setName('TaskFlow');
 app.setPath('userData', userData);
 
@@ -63,7 +67,9 @@ function showWindow() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'src', 'assets', 'tray.png')).resize({ width: 18, height: 18 });
+  // 16px is what the Windows notification area asks for; the menu bar on macOS takes 18.
+  const size = isWindows ? 16 : 18;
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'src', 'assets', 'tray.png')).resize({ width: size, height: size });
   tray = new Tray(icon);
   tray.setToolTip(t('trayTooltip'));
   tray.setContextMenu(Menu.buildFromTemplate(buildTrayMenu({ t, actions: { show: showWindow, quit: () => app.quit() } })));
@@ -81,6 +87,8 @@ function createWindow() {
     minHeight: 560,
     show: !hidden,
     title: 'TaskFlow',
+    // The window and taskbar icon off macOS (the .app carries its own); the menu bar hides until Alt is pressed there.
+    ...(isMac ? {} : { icon: path.join(__dirname, 'src', 'assets', 'icon.png'), autoHideMenuBar: true }),
     backgroundColor: '#f1f6ff',
     webPreferences: {
       contextIsolation: true,
@@ -196,6 +204,11 @@ const actions = {
   openLogs: () => shell.openPath(paths.logsDir),
 };
 
+// Windows groups notifications and the taskbar button by this id; without it toasts show up under a made-up name.
+if (isWindows) {
+  app.setAppUserModelId('com.taskflow.desktop');
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -213,7 +226,7 @@ if (!app.requestSingleInstanceLock()) {
         showWindow();
       }
     });
-    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ t, actions, isDev: !app.isPackaged })));
+    Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenuTemplate({ t, actions, isDev: !app.isPackaged, platform: process.platform })));
     createWindow();
     if (!hidden) {
       createTray();
@@ -222,7 +235,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // No window-all-closed handler: closing the window hides it and the app keeps running in the menu bar to
-  // deliver reminders. It ends only through Quit (Cmd+Q or the menu-bar item), which stops the database and API.
+  // deliver reminders. It ends only through Quit (Cmd+Q, or the menu-bar / tray item), which stops the database and API.
   app.on('window-all-closed', () => {});
 
   app.on('before-quit', (event) => {

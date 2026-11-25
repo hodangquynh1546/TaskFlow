@@ -39,3 +39,8 @@ desktop/node_modules/
 desktop/resources/
 desktop/dist/
 desktop/.cache/
+
+# Installers built by desktop/scripts/build.sh --release (large binaries, handed out by hand)
+release/
+desktop/resources-win/
+desktop/dist-win/

@@ -1,17 +1,16 @@
 'use strict';
 
 /** The native menu. `actions` are callbacks supplied by main.js so this file stays free of Electron imports. */
-function buildMenuTemplate({ t, actions, isDev }) {
+function buildMenuTemplate({ t, actions, isDev, platform = process.platform }) {
+  const mac = platform === 'darwin';
   return [
     {
       label: 'TaskFlow',
       submenu: [
         { role: 'about', label: t('menuAbout') },
         { type: 'separator' },
-        { role: 'hide', label: t('menuHide') },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
+        // Hiding the app and the others is a macOS idea; Windows has no such commands.
+        ...(mac ? [{ role: 'hide', label: t('menuHide') }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }] : []),
         { role: 'quit', label: t('menuQuit') },
       ],
     },

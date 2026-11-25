@@ -20,12 +20,13 @@ function setup(extra = {}) {
     port: 54329,
     deps: {
       stopSteps: FAST_STOP,
-      execFile: (file, args, options, callback) => {
+      platform: extra.platform,
+      execFile: extra.execFile ?? ((file, args, options, callback) => {
         calls.initdb.push({ file, args, pwFileExistedDuring: fs.existsSync(args[args.indexOf('--pwfile') + 1]) });
         fs.mkdirSync(dataDir, { recursive: true });
         fs.writeFileSync(path.join(dataDir, 'PG_VERSION'), '16\n');
         callback(null, '', '');
-      },
+      }),
       spawn: (file, args, options) => {
         const child = new FakeChild(extra.child);
         calls.spawn.push({ file, args, options });
@@ -154,4 +155,120 @@ test('postgres: the connection string points at loopback and the right port and 
   const text = server.connectionString();
 
   assert.match(text, /Host=127\.0\.0\.1;Port=54329;Database=postgres;Username=taskflow;/);
+});
+
+// ---- Windows --------------------------------------------------------------------------------------------------------
+// These cannot run the real programs, only check what would be asked of them: the rest is a matter of the bundle.
+
+test('postgres on Windows: the programs are the .exe files of the bundle, with their window hidden', async () => {
+  const { server, calls } = setup({ platform: 'win32' });
+
+  await server.start();
+
+  assert.equal(calls.initdb[0].file, '/bundle/postgres/bin/initdb.exe');
+  assert.equal(calls.spawn[0].file, '/bundle/postgres/bin/postgres.exe');
+  assert.equal(calls.spawn[0].options.windowsHide, true);
+});
+
+test('postgres on Windows: Unicode-aware lower-casing comes from ICU, since "C" would fold ASCII only and Windows has no en_US.UTF-8', async () => {
+  const { server, calls } = setup({ platform: 'win32' });
+
+  await server.start();
+
+  const args = calls.initdb[0].args;
+  assert.ok(args.includes('UTF8'));
+  assert.ok(args.includes('--locale-provider=icu') && args.includes('--icu-locale=en-US'));
+  assert.ok(!args.some((a) => a.includes('en_US.UTF-8')), 'that libc locale does not exist on Windows');
+  assert.ok(!args.join(' ').includes('S3cret-pass'));
+});
+
+test('postgres on Windows: no unix socket setting (the parameter is unknown there and the server would refuse to start), still loopback only', async () => {
+  const { server, calls } = setup({ platform: 'win32' });
+
+  await server.start();
+
+  const args = calls.spawn[0].args;
+  assert.ok(!args.some((a) => a.startsWith('unix_socket_directories')));
+  assert.ok(args.includes('listen_addresses=127.0.0.1'));
+  assert.equal(args[args.indexOf('-p') + 1], '54329');
+});
+
+test('postgres on Windows: the environment does not force a unix locale; elsewhere it still does', () => {
+  assert.equal(setup({ platform: 'win32' }).server.environment().LC_ALL, process.env.LC_ALL);
+  assert.equal(setup({ platform: 'darwin' }).server.environment().LC_ALL, 'en_US.UTF-8');
+});
+
+test('postgres on Windows: stopping asks pg_ctl for a fast shutdown first, because a signal would end the server abruptly', async () => {
+  const asked = [];
+  const { server, children } = setup({
+    platform: 'win32',
+    execFile: (file, args, options, callback) => {
+      asked.push({ file, args, options });
+      if (args[0] === 'stop') {
+        children[0].exit(0); // what pg_ctl -w achieves: it returns only after the server has left on its own
+      } else {
+        fs.mkdirSync(server.dataDir, { recursive: true });
+        fs.writeFileSync(path.join(server.dataDir, 'PG_VERSION'), '16\n');
+      }
+      callback(null, '', '');
+    },
+  });
+  await server.start();
+
+  const clean = await server.stop();
+
+  const stop = asked.find((a) => a.args[0] === 'stop');
+  assert.equal(stop.file, '/bundle/postgres/bin/pg_ctl.exe');
+  assert.deepEqual(stop.args.slice(0, 4), ['stop', '-D', server.dataDir, '-m']);
+  assert.equal(stop.args[stop.args.indexOf('-m') + 1], 'fast');
+  assert.ok(stop.args.includes('-w'), 'it waits for the shutdown to finish');
+  assert.equal(stop.options.windowsHide, true);
+  assert.deepEqual(children[0].signals, [], 'no signal was needed');
+  assert.equal(clean, true);
+});
+
+test('postgres on Windows: if pg_ctl fails, the server is ended after all rather than left running', async () => {
+  const { server, children } = setup({
+    platform: 'win32',
+    execFile: (file, args, options, callback) => {
+      if (args[0] === 'stop') {
+        return callback(new Error('pg_ctl: could not send stop signal'), '', '');
+      }
+      fs.mkdirSync(server.dataDir, { recursive: true });
+      fs.writeFileSync(path.join(server.dataDir, 'PG_VERSION'), '16\n');
+      return callback(null, '', '');
+    },
+  });
+  await server.start();
+
+  await server.stop();
+
+  assert.ok(children[0].signals.length > 0, 'it fell back to the signals');
+});
+
+test('postgres on Windows: a server left over from a crash is asked to stop through pg_ctl too', async () => {
+  const asked = [];
+  let alive = true;
+  const { server, dataDir } = setup({
+    platform: 'win32',
+    isAlive: () => alive,
+    kill: () => assert.fail('a signal ends a Windows process abruptly: pg_ctl must be used'),
+    execFile: (file, args, options, callback) => {
+      asked.push(args[0]);
+      if (args[0] === 'stop') {
+        alive = false;
+      } else {
+        fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(path.join(dataDir, 'PG_VERSION'), '16\n');
+      }
+      callback(null, '', '');
+    },
+  });
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, 'PG_VERSION'), '16\n');
+  fs.writeFileSync(path.join(dataDir, 'postmaster.pid'), '4242\n');
+
+  await server.start();
+
+  assert.ok(asked.includes('stop'));
 });

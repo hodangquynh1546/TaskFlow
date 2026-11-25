@@ -46,6 +46,20 @@ Xem [README](../../README.md#ứng-dụng-mac-độc-lập-không-cần-docker-h
 - Biến `ELECTRON_RUN_AS_NODE` (VS Code đặt trong terminal của nó) làm ứng dụng thoát ngay không báo lỗi khi chạy từ terminal; chạy kiểm thử bằng `env -u ELECTRON_RUN_AS_NODE`. Mở từ Finder không bị ảnh hưởng.
 - Biến kiểm thử: `TASKFLOW_USER_DATA` (thư mục dữ liệu khác), `TASKFLOW_HIDDEN=1` (không hiện cửa sổ).
 
+### Bản cài đặt để gửi cho người khác (`release/`)
+`desktop/scripts/build.sh --release` build app rồi đóng gói `release/TaskFlow-<phiên bản>-AppleSilicon.dmg` (kéo-thả vào Applications, kèm `HUONG-DAN-CAI-DAT.txt` ở trong ảnh đĩa và nằm cạnh nó). Thư mục `release/` bị gitignore (tệp nhị phân ~200 MB), gửi tệp `.dmg` và tệp hướng dẫn cho người nhận.
+- Chỉ Apple Silicon (M1 trở lên), macOS 13 trở lên. App tự chứa: PostgreSQL và API chỉ dùng thư viện hệ thống, khóa JWT và mật khẩu DB sinh riêng cho từng máy (`secrets.bin`), dữ liệu ở `~/Library/Application Support/TaskFlow Desktop`, mỗi máy một dữ liệu, không đồng bộ.
+- **Chưa có Developer ID và chưa công chứng (notarize)**: chỉ ký ad hoc. Người nhận bị Gatekeeper chặn ở lần mở đầu và phải bấm "Vẫn mở" ở Cài đặt Hệ thống hoặc chạy `xattr -cr /Applications/TaskFlow.app` (hướng dẫn nằm trong tệp đi kèm). Muốn hết bước này cần tài khoản Apple Developer (99 USD/năm), ký Developer ID và notarize; chưa làm theo quyết định hoãn việc phát hành.
+- Chưa có bản Intel hay Windows, chưa có tự cập nhật: bản mới gửi lại `.dmg`, người nhận kéo đè, dữ liệu giữ nguyên.
+
+### Bản cài đặt cho Windows (`release/`)
+`desktop/scripts/build-win.sh` (chạy trên Mac) tạo `release/TaskFlow-Setup-<phiên bản>-x64.exe` (trình cài NSIS, 64-bit, cài theo từng người dùng, không cần quyền quản trị) và `release/HUONG-DAN-CAI-DAT-WINDOWS.txt`. Cần `brew install sevenzip` (giải nén Visual C++ runtime). Cấu hình ở `desktop/electron-builder.win.yml`; tài nguyên Windows ở `desktop/resources-win/` (gitignore).
+- Cùng mã Electron với bản Mac. Phần riêng cho Windows: tên `.exe`, `windowsHide` cho mọi tiến trình con, PostgreSQL khởi tạo bằng ICU (`--locale=C --locale-provider=icu --icu-locale=en-US`) vì Windows không có `en_US.UTF-8` và locale `C` không hạ chữ hoa Unicode (tìm kiếm tiếng Việt), bỏ `unix_socket_directories`, tắt PostgreSQL bằng `pg_ctl stop -m fast` (tín hiệu trên Windows kết thúc tiến trình ngay), kiểm tra pid cũ bằng PowerShell thay cho `ps`, `tar.exe` của hệ thống để sao lưu, `AppUserModelId` cho thông báo, biểu tượng khay 16px.
+- PostgreSQL: bản EDB do dự án embedded-postgres-binaries đóng gói (16.15.0, ghim SHA-1). Nó cần `VCRUNTIME140.dll`, nên `fetch-postgres-win.sh` lấy `vcruntime140.dll`, `vcruntime140_1.dll`, `msvcp140.dll` (x64) từ Visual C++ Redistributable chính thức của Microsoft (ghim SHA-256) và đặt cạnh chương trình (app-local deployment, được phép).
+- Dữ liệu ở `%APPDATA%\TaskFlow Desktop`; nếu tên tài khoản hoặc đường dẫn có chữ có dấu thì ở `C:\ProgramData\TaskFlow\<mã 10 ký tự theo tài khoản>`, vì PostgreSQL trên Windows hay lỗi với đường dẫn không phải ASCII.
+- **Chưa chạy thử trên Windows thật** (build từ Mac, không có Windows hay Wine). Đã kiểm: gói đủ tệp và đúng định dạng PE x64, test đơn vị cho phần riêng của Windows (lệnh gọi, tham số, đường dẫn), cách khởi tạo ICU chạy đúng trên PostgreSQL 16 của Mac. Chưa kiểm: khởi động thật, thông báo, khay hệ thống, tắt PostgreSQL bằng `pg_ctl`.
+- Chưa ký số: SmartScreen hiện cảnh báo "Windows protected your PC" (người nhận bấm More info > Run anyway). Biểu tượng của tệp `.exe` là biểu tượng Electron mặc định (đổi cần Wine hoặc máy Windows); cửa sổ, thanh tác vụ và khay dùng biểu tượng TaskFlow.
+
 ## Cài như ứng dụng trên Mac bằng Docker (phương án cũ)
 Xem [README](../../README.md#cài-như-ứng-dụng-trên-mac). Thiết kế:
 - Dùng lại Docker Compose (profile `app`/`tools`) với project riêng `taskflow-app`, cổng 8765 (web) và 5433 (PostgreSQL), volume riêng nên không đụng dữ liệu phát triển.

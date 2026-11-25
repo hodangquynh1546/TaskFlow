@@ -3,13 +3,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { resolvePaths } = require('../src/paths');
+const { defaultUserData, resolvePaths } = require('../src/paths');
 const net = require('node:net');
 const { freePort, stablePort } = require('../src/ports');
 const { loadOrCreateSecrets } = require('../src/secrets');
 const { languageFor, translator, MESSAGES } = require('../src/strings');
 const { buildMenuTemplate } = require('../src/menu');
 const { stopChild, tail } = require('../src/process');
+const { samePath } = require('../src/api');
+const { systemTar } = require('../src/lifecycle');
 const { FakeChild, tempDir } = require('./helpers');
 
 test('paths: packaged apps read the bundle from the app resources, development from ./resources', () => {
@@ -160,4 +162,68 @@ test('ports: a damaged or silly remembered value is ignored', async () => {
 
     assert.ok(port >= 1024 && port <= 65535, text);
   }
+});
+
+test('paths on Windows: the API and the PostgreSQL programs are .exe files', () => {
+  const p = resolvePaths({ isPackaged: true, resourcesPath: 'C:/App/resources', devResources: '', userData: 'C:/u', platform: 'win32' });
+
+  assert.ok(p.apiBinary.endsWith('TaskManagement.API.exe'));
+  assert.ok(p.pgBin('initdb').endsWith('initdb.exe'));
+  assert.ok(p.pgBin('pg_ctl').endsWith('pg_ctl.exe'));
+});
+
+test('paths elsewhere: no extension', () => {
+  const p = resolvePaths({ isPackaged: true, resourcesPath: '/r', devResources: '', userData: '/u', platform: 'darwin' });
+
+  assert.ok(p.apiBinary.endsWith('TaskManagement.API'));
+  assert.ok(p.pgBin('postgres').endsWith('/postgres'));
+});
+
+test('menu: the macOS-only hide commands are left out on Windows, where the quit command stays', () => {
+  const labels = (platform) => JSON.stringify(buildMenuTemplate({ t: (k) => k, actions: {}, isDev: false, platform }));
+
+  assert.ok(labels('darwin').includes('hideOthers'));
+  assert.ok(!labels('win32').includes('hideOthers') && !labels('win32').includes('"hide"'));
+  assert.ok(labels('win32').includes('"quit"'));
+});
+
+test('api: a leftover pid counts as ours only when its program path is the API binary; on Windows case and slash direction do not matter', () => {
+  assert.equal(samePath('/App/api/TaskManagement.API --x', '/App/api/TaskManagement.API', 'darwin'), true);
+  assert.equal(samePath('/Other/thing', '/App/api/TaskManagement.API', 'darwin'), false);
+  assert.equal(samePath('c:\\users\\a\\taskflow\\resources\\api\\taskmanagement.api.exe', 'C:/Users/a/TaskFlow/resources/api/TaskManagement.API.exe', 'win32'), true);
+  assert.equal(samePath('C:\\Windows\\notepad.exe', 'C:/Users/a/TaskFlow/resources/api/TaskManagement.API.exe', 'win32'), false);
+  assert.equal(samePath('/app/api/taskmanagement.api', '/App/api/TaskManagement.API', 'darwin'), false, 'on macOS case matters');
+});
+
+test('backup: Windows uses the tar.exe of the system, not whichever tar comes first on the path', () => {
+  assert.equal(systemTar('darwin'), '/usr/bin/tar');
+  assert.match(systemTar('win32'), /system32[\\/]tar\.exe$/i);
+});
+
+test('data folder: the usual one, unless Windows would hand PostgreSQL a path with non-ASCII letters', () => {
+  const win = (appData, username) => defaultUserData({ platform: 'win32', appData, programData: 'C:/ProgramData', username });
+
+  assert.equal(defaultUserData({ platform: 'darwin', appData: '/Users/a/Library/Application Support', username: 'a' }), path.join('/Users/a/Library/Application Support', 'TaskFlow Desktop'));
+  assert.equal(win('C:/Users/an/AppData/Roaming', 'an'), path.join('C:/Users/an/AppData/Roaming', 'TaskFlow Desktop'));
+
+  const fallback = win('C:/Users/Nguyễn Văn/AppData/Roaming', 'Nguyễn Văn');
+  assert.ok(fallback.startsWith(path.join('C:/ProgramData', 'TaskFlow')), fallback);
+  assert.match(fallback, /^[\x20-\x7e]+$/, 'the fallback itself is plain ASCII');
+});
+
+test('data folder: the ASCII fallback is the same for one account and different between accounts', () => {
+  const win = (username) => defaultUserData({ platform: 'win32', appData: 'C:/Users/Đạt/AppData/Roaming', programData: 'C:/ProgramData', username });
+
+  assert.equal(win('Đạt'), win('Đạt'));
+  assert.notEqual(win('Đạt'), win('Hà'));
+});
+
+test('data folder: a non-ASCII account name alone is enough, even when the path looks plain', () => {
+  const folder = defaultUserData({ platform: 'win32', appData: 'D:/Data/Roaming', programData: 'C:/ProgramData', username: 'Hồ' });
+
+  assert.ok(folder.startsWith(path.join('C:/ProgramData', 'TaskFlow')), folder);
+});
+
+test('data folder: macOS keeps the usual one whatever the letters', () => {
+  assert.equal(defaultUserData({ platform: 'darwin', appData: '/Users/Đạt/Library/Application Support', username: 'Đạt' }), path.join('/Users/Đạt/Library/Application Support', 'TaskFlow Desktop'));
 });

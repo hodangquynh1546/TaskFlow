@@ -140,10 +140,15 @@ class TaskFlowRuntime {
   }
 }
 
+/** The system tar: /usr/bin/tar on macOS, and on Windows the one Windows 10 and later ship (not a GNU tar from Git, which reads "C:" as a host name). */
+function systemTar(platform = process.platform) {
+  return platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : '/usr/bin/tar';
+}
+
 function runTar(args) {
   return new Promise((resolve, reject) => {
-    childProcess.execFile('/usr/bin/tar', args, (error, stdout, stderr) => (error ? reject(new Error(String(stderr || error.message))) : resolve()));
+    childProcess.execFile(systemTar(), args, { windowsHide: true }, (error, stdout, stderr) => (error ? reject(new Error(String(stderr || error.message))) : resolve()));
   });
 }
 
-module.exports = { TaskFlowRuntime };
+module.exports = { TaskFlowRuntime, systemTar };
